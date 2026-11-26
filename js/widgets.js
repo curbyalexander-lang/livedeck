@@ -81,7 +81,8 @@ export function customType({ F, h1 }) {
     stage(s, ctx) {
       const code = codeOf(s, ctx), name = nameOf(s, ctx);
       let body;
-      if (!code) body = `<div class="ph">Choose a widget in the panel</div>`;
+      if (ctx.exporting) body = `<div class="exwidget"><span>Interactive activity</span><b>${esc(name)}</b></div>`;
+      else if (!code) body = `<div class="ph">Choose a widget in the panel</div>`;
       else if (ctx.thumb) body = `<div class="ph">Widget: ${esc(name)}</div>`;
       else body = `<iframe class="wframe" sandbox="allow-scripts" title="${esc(name)}" srcdoc="${esc(widgetDoc(code, { mode: ctx.mode === 'present' ? 'stage' : 'edit', prompt: s.prompt || '', config: parseConfig(s.config), theme: ctx.theme, state: stageState(ctx) }))}"></iframe>`;
       return `${h1(s.prompt)}<div class="wbox">${body}</div>`;

@@ -46,9 +46,19 @@ function videoEmbed(url, thumb) {
   return s ? `<video src="${esc(s)}" controls playsinline></video>` : `<div class="ph">That link doesn't look like a video</div>`;
 }
 
+// A still picture of a video for exports: YouTube's thumbnail when there is one, plus the link.
+function videoStill(url) {
+  const u = String(url || '').trim(); if (!u) return '';
+  const m = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  const link = safeUrl(u) ? `<a class="vlink" href="${esc(u)}">${esc(u)}</a>` : '';
+  return `<div class="vstill">${m ? `<img src="https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg" alt="Video thumbnail" onerror="this.remove()">` : ''}<span class="vplay">▶</span>${link}</div>`;
+}
+
 // ---------- shared pieces for interactive slides ----------
 function interactiveStage(T, s, ctx) {
   const v = ctx.values || [], on = !!ctx.reveal;
+  if (ctx.exporting && !v.length) // exported without results: show the activity itself, not a live counter
+    return `<div class="head">${h1(s.prompt)}</div><div class="viz">${T.still ? T.still(s) : ''}</div><p class="foot">Live activity</p>`;
   const stat = `${v.length} ${v.length === 1 ? 'response' : 'responses'}${on && T.stat ? T.stat(s, v) : ''}`;
   const foot = on ? (ctx.mode === 'edit' ? 'Sample results shown for preview' : '') : (ctx.mode === 'present' ? 'Results hidden. Press R to reveal.' : 'Results stay hidden until you reveal them');
   return `<div class="head">${h1(s.prompt)}<p class="stat">${stat}</p></div>
@@ -70,7 +80,7 @@ function wheel(items) {
 function spinTo(root, s, live, animate, mode) {
   const its = list(s.items, 12), g = root.querySelector('.wg'), res = root.querySelector('[data-res]');
   const pick = (i, text) => {
-    if (res) res.textContent = text ?? (i == null ? (mode === 'phone' ? 'Waiting for the spin…' : mode === 'present' ? 'Press Spin (or S)' : 'Spin while presenting') : its[i]);
+    if (res) res.textContent = text ?? (i == null ? (mode === 'phone' ? 'Waiting for the spin…' : mode === 'present' ? 'Press Spin (or S)' : mode === 'export' ? '' : 'Spin while presenting') : its[i]);
     root.querySelectorAll('.plist li').forEach((li, j) => li.classList.toggle('pick', j === i));
   };
   clearTimeout(root._spinT);
@@ -123,7 +133,7 @@ export const TYPES = {
     label: 'Video', group: 'Content', blurb: 'YouTube, Vimeo, or an .mp4 file',
     defaults: { heading: '', url: '' },
     fields: [F('heading', 'Heading (optional)'), F('url', 'Video link', 'text', 'YouTube, Vimeo, or a direct .mp4 link (a file in your repo works too, e.g. media/clip.mp4)')],
-    stage: (s, ctx) => `${h1(s.heading)}<div class="media vid">${videoEmbed(s.url, ctx.thumb)}</div>`,
+    stage: (s, ctx) => `${h1(s.heading)}<div class="media vid">${ctx.exporting ? videoStill(s.url) : videoEmbed(s.url, ctx.thumb)}</div>`,
     phone: s => `${s.heading ? `<h2>${esc(s.heading)}</h2>` : ''}<p class="look"><strong>Watch the screen.</strong></p>`
   },
 
@@ -131,6 +141,7 @@ export const TYPES = {
     label: 'Poll', group: 'Interactive', blurb: 'Everyone picks one option; live bars', interactive: true,
     defaults: { prompt: 'Your question?', options: ['Option A', 'Option B', 'Option C'] },
     fields: [F('prompt', 'Question'), F('options', 'Options', 'list', 'One per line, 2 to 8')],
+    still: s => `<ol class="exlist">${list(s.options, 8).map(o => `<li>${esc(o)}</li>`).join('')}</ol>`,
     valid: (s, v) => Number.isInteger(v) && v >= 0 && v < list(s.options, 8).length,
     sim: (s, rnd) => Math.min(Math.floor(rnd() ** 1.4 * list(s.options, 8).length), list(s.options, 8).length - 1),
     viz(s, v) {
@@ -147,6 +158,7 @@ export const TYPES = {
     label: 'Slider', group: 'Interactive', blurb: 'Rate on a scale; live histogram and average', interactive: true,
     defaults: { prompt: 'How confident are you?', min: 0, max: 10, lo: 'Not at all', hi: 'Completely' },
     fields: [F('prompt', 'Question'), F('min', 'Lowest value', 'number'), F('max', 'Highest value', 'number', 'Up to 20 steps from lowest to highest'), F('lo', 'Low-end label'), F('hi', 'High-end label')],
+    still: s => `<div class="vcol exscale"><div class="cls">${Array.from({ length: +s.max - +s.min + 1 }, (_, i) => `<span>${i + +s.min}</span>`).join('')}</div><div class="ends"><span>${esc(s.lo)}</span><span>${esc(s.hi)}</span></div></div>`,
     valid: (s, v) => Number.isInteger(v) && v >= +s.min && v <= +s.max,
     sim: (s, rnd) => { const a = +s.min, b = +s.max; return Math.max(a, Math.min(b, Math.round(a + (b - a) * (.62 + (rnd() + rnd() + rnd() - 1.5) * .3)))); },
     stat: (s, v) => v.length ? ` · average ${(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1)}` : '',
@@ -165,6 +177,7 @@ export const TYPES = {
     label: 'Ranking', group: 'Interactive', blurb: 'Everyone puts items in order; shows the group ranking', interactive: true,
     defaults: { prompt: 'Rank these from most to least important', items: ['First item', 'Second item', 'Third item', 'Fourth item'] },
     fields: [F('prompt', 'Prompt'), F('items', 'Items', 'list', 'One per line, 2 to 8')],
+    still: s => `<ol class="exlist">${list(s.items, 8).map(o => `<li>${esc(o)}</li>`).join('')}</ol>`,
     valid(s, v) { const k = list(s.items, 8).length; return Array.isArray(v) && v.length === k && new Set(v).size === k && v.every(x => Number.isInteger(x) && x >= 0 && x < k); },
     sim(s, rnd) { const a = [...list(s.items, 8).keys()]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; },
     viz(s, v) {
@@ -190,6 +203,7 @@ export const TYPES = {
     label: 'Word cloud', group: 'Interactive', blurb: 'Short answers grow bigger as more people send them', interactive: true,
     defaults: { prompt: 'In one word…' },
     fields: [F('prompt', 'Prompt')],
+    still: () => '<p class="wl">Everyone adds a word or short phrase</p>',
     norm: w => String(w || '').toLowerCase().replace(/[^a-z0-9' -]/g, '').replace(/\s+/g, ' ').trim().slice(0, 30),
     valid: (s, v) => typeof v === 'string' && /^[a-z0-9][a-z0-9' -]{0,29}$/.test(v),
     sim: (s, rnd) => ['engaging', 'curious', 'alive', 'playful', 'surprising', 'clear', 'memorable', 'focused', 'fun', 'energizing'][Math.floor(rnd() ** 1.7 * 10)],
@@ -210,7 +224,7 @@ export const TYPES = {
     label: 'Spinner', group: 'Interactive', blurb: 'You spin; every phone sees where it lands', action: 'Spin',
     defaults: { title: 'Spin for a discussion prompt', items: ['A lesson that flopped', 'A tool you abandoned', 'Your best "aha" moment', 'A student who surprised you'] },
     fields: [F('title', 'Title'), F('items', 'Wheel items', 'list', 'One per line, 2 to 12')],
-    stage: s => `${h1(s.title)}<div class="split spinrow"><div class="wheelbox">${wheel(list(s.items, 12))}</div><div><p class="lbl">The wheel says</p><p class="result" data-res></p><ol class="plist">${list(s.items, 12).map(x => `<li>${esc(x)}</li>`).join('')}</ol></div></div>`,
+    stage: (s, ctx) => `${h1(s.title)}<div class="split spinrow"><div class="wheelbox">${wheel(list(s.items, 12))}</div><div>${ctx.exporting && !ctx.live ? '' : '<p class="lbl">The wheel says</p>'}<p class="result" data-res></p><ol class="plist">${list(s.items, 12).map(x => `<li>${esc(x)}</li>`).join('')}</ol></div></div>`,
     after: (s, root, ctx, animate) => spinTo(root, s, ctx.live, animate, ctx.mode),
     run(s, prev) { const k = list(s.items, 12).length; let idx = Math.floor(Math.random() * k); if (prev && k > 1 && idx === prev.idx) idx = (idx + 1) % k; return { idx, n: Date.now() }; },
     mount(s, el) { el.innerHTML = `<div class="pwheel">${wheel(list(s.items, 12))}</div><p class="result" data-res></p>`; }

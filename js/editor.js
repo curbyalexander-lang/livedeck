@@ -21,7 +21,7 @@ export async function mount(root, store, id) {
   <header class="edbar"><a class="btn ghost" href="#decks">← Presentations</a>
     <input id="dtitle" class="dtitle" aria-label="Presentation title" maxlength="120">
     <span class="status" id="status" aria-live="polite">Saved</span><span class="status" title="LiveDeck version">v${VERSION}</span><span class="grow"></span>
-    <button class="btn" id="theme">Theme</button><button class="btn" id="wlib">Widgets</button><button class="btn" id="export">Export JSON</button><button class="btn primary" id="present">Present</button></header>
+    <button class="btn" id="theme">Theme</button><button class="btn" id="wlib">Widgets</button><button class="btn" id="export">Export</button><button class="btn primary" id="present">Present</button></header>
   <aside class="rail"><ol id="thumbs" class="thumbs"></ol><button class="btn add" id="add">+ Add slide</button></aside>
   <main class="canvas"><div class="ctop"><span id="slabel" class="muted"></span>
     <label class="chk"><input type="checkbox" id="sample" checked> Preview with sample results</label></div>
@@ -223,15 +223,7 @@ export async function mount(root, store, id) {
   $('#wlib').onclick = () => openLib();
 
   // ---- export / present ----
-  $('#export').onclick = () => {
-    const { id: _i, owner: _o, ...rest } = deck;
-    rest.widgets = {}; // bundle the custom widgets this deck uses, so the file works on its own
-    deck.slides.forEach(sl => { const w = sl.type === 'custom' && widgets[sl.widgetId]; if (w) rest.widgets[w.id] = { name: w.name, description: w.description || '', code: w.code, config: w.config || '' }; });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(rest, null, 2)], { type: 'application/json' }));
-    a.download = (deck.title || 'presentation').replace(/[^\w-]+/g, '_') + '.json'; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  };
+  $('#export').onclick = async () => { const { openExport } = await import('./export.js?v=2.3'); openExport({ store, deck, widgets }); };
   $('#present').onclick = async () => { await save(); location.hash = '#present-' + id; };
 
   arr = createArrange($('#preview'), {

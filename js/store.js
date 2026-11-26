@@ -44,6 +44,9 @@ async function firebaseStore() {
     updateSession: (code, patch) => F.updateDoc(F.doc(db, 'sessions', code), clean(patch)),
     watchSession: (code, cb) => F.onSnapshot(F.doc(db, 'sessions', code), d => cb(d.exists() ? d.data() : null), () => cb(null)),
     setResponse: (code, uid, r) => F.setDoc(F.doc(db, 'sessions', code, 'responses', uid), clean({ r, updatedAt: Date.now() })),
+    // Past sessions of a deck, and their answers (for exporting results)
+    async listSessions(deckId) { const q = await F.getDocs(F.query(F.collection(db, 'sessions'), F.where('owner', '==', user.uid), F.where('deckId', '==', deckId))); return q.docs.map(d => ({ code: d.id, createdAt: d.data().createdAt || 0, open: !!d.data().open, live: d.data().live || {} })); },
+    async getResponses(code) { const q = await F.getDocs(F.collection(db, 'sessions', code, 'responses')); return q.docs.map(d => ({ uid: d.id, ...d.data() })); },
     // Presenter-only shared state for a session (drawings, timer, remote heartbeat). Phones never read it.
     setStage: (code, patch) => F.setDoc(F.doc(db, 'sessions', code, 'stage', 'main'), clean(patch), { merge: true }),
     watchStage: (code, cb) => F.onSnapshot(F.doc(db, 'sessions', code, 'stage', 'main'), d => cb(d.exists() ? d.data() : {}), () => { }),
@@ -89,6 +92,12 @@ function localStore() {
     async updateSession(code, patch) { const s = get('s:' + code); if (s) set('s:' + code, clean({ ...s, ...patch })); },
     watchSession: (code, cb) => watch('s:' + code, () => cb(get('s:' + code))),
     async setResponse(code, uid, r) { const all = get('r:' + code) || {}; all[uid] = clean({ r, updatedAt: Date.now() }); set('r:' + code, all); },
+    async listSessions(deckId) {
+      const out = [];
+      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!k || !k.startsWith(K + 's:')) continue; const v = get(k.slice(K.length)); if (v && v.deckId === deckId) out.push({ code: k.slice(K.length + 2), createdAt: v.createdAt || 0, open: !!v.open, live: v.live || {} }); }
+      return out;
+    },
+    getResponses: async code => Object.entries(get('r:' + code) || {}).map(([uid, v]) => ({ uid, ...v })),
     async setStage(code, patch) { // merges one level deep, like Firestore's merge
       const cur = get('st:' + code) || {};
       for (const [k, v] of Object.entries(clean(patch))) cur[k] = v && typeof v === 'object' && !Array.isArray(v) && cur[k] && typeof cur[k] === 'object' ? { ...cur[k], ...v } : v;

@@ -73,8 +73,13 @@ export async function mount(root, store) {
     $('#list').innerHTML = decks.map(d => `<div class="deck">
       <div class="dmeta"><a class="dname" href="#edit-${esc(d.id)}">${esc(d.title || 'Untitled')}</a>
       <span class="muted">${(d.slides || []).length} slides · edited ${d.updatedAt ? new Date(d.updatedAt).toLocaleString() : '—'}</span></div>
-      <a class="btn" href="#edit-${esc(d.id)}">Edit</a><a class="btn primary" href="#present-${esc(d.id)}">Present</a>
+      <a class="btn" href="#edit-${esc(d.id)}">Edit</a><button class="btn exp" data-id="${esc(d.id)}">Export</button><a class="btn primary" href="#present-${esc(d.id)}">Present</a>
       <button class="btn ghost del" data-id="${esc(d.id)}">Delete</button></div>`).join('');
+    root.querySelectorAll('.exp').forEach(b => b.onclick = async () => {
+      const deck = decks.find(x => x.id === b.dataset.id); if (!deck) return;
+      const widgets = {}; try { (await store.listItems('widgets')).forEach(w => widgets[w.id] = w); } catch (e) { }
+      const { openExport } = await import('./export.js?v=2.3'); openExport({ store, deck, widgets });
+    });
     root.querySelectorAll('.del').forEach(b => b.onclick = async () => {
       if (!b.classList.contains('confirm')) { b.classList.add('confirm'); b.textContent = 'Click again to delete'; setTimeout(() => { b.classList.remove('confirm'); b.textContent = 'Delete'; }, 3000); return; }
       try { await store.deleteDeck(b.dataset.id); draw(); } catch (e) { err(e.message); }
