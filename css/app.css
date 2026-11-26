@@ -380,3 +380,6 @@ canvas.ink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
   .pnum{font-weight:700;margin:0 0 .1in}
   .vlink{color:#fff}
 }
+.endbtns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:3cqi 0 0}
+.rended .endbtns{justify-content:flex-start;margin:8px 0 0}
+.rended p{margin:0}
