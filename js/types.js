@@ -11,11 +11,14 @@
 //   sim(s, rnd)              – a fake response, for sample previews
 //   after(s, root, ctx, animate) – runs after render (spinner animation)
 //   action, run(s, live)     – presenter button + the live state it produces
+//   update(s, root, ctx)     – refresh live data without re-rendering (custom widgets)
 // To invent a new interaction, add one more entry here. Nothing else changes.
 // =====================================================================
 
-export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-export const safeUrl = u => typeof u === 'string' && /^(https:\/\/|data:image\/|data:video\/|blob:|[\w][\w./%-]*$)/i.test(u.trim()) ? u.trim() : '';
+import { esc, safeUrl } from './util.js';
+import { themeStyle } from './themes.js';
+import { customType } from './widgets.js';
+export { esc, safeUrl };
 const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const F = (k, label, type = 'text', hint = '', opts = null) => ({ k, label, type, hint, opts });
 const list = (a, max) => (Array.isArray(a) ? a : []).map(x => String(x).trim()).filter(Boolean).slice(0, max);
@@ -59,10 +62,10 @@ function wheel(items) {
   const k = Math.max(items.length, 1), R = 100, a = 2 * Math.PI / k; let p = '';
   for (let i = 0; i < k; i++) {
     const a0 = i * a - Math.PI / 2, a1 = a0 + a;
-    p += `<path d="M0 0L${(R * Math.cos(a0)).toFixed(2)} ${(R * Math.sin(a0)).toFixed(2)}A${R} ${R} 0 0 1 ${(R * Math.cos(a1)).toFixed(2)} ${(R * Math.sin(a1)).toFixed(2)}Z" fill="${i % 2 ? '#fff' : '#e4ecfa'}" stroke="#000" stroke-width="1.2"/>`;
-    p += `<text transform="rotate(${((a0 + a / 2) * 180 / Math.PI).toFixed(2)}) translate(66 0) rotate(90)" font-size="${k > 8 ? 12 : 15}" font-weight="700" font-family="Arial" text-anchor="middle" dominant-baseline="middle">${i + 1}</text>`;
+    p += `<path d="M0 0L${(R * Math.cos(a0)).toFixed(2)} ${(R * Math.sin(a0)).toFixed(2)}A${R} ${R} 0 0 1 ${(R * Math.cos(a1)).toFixed(2)} ${(R * Math.sin(a1)).toFixed(2)}Z" class="seg${i % 2 ? '' : ' alt'}"/>`;
+    p += `<text transform="rotate(${((a0 + a / 2) * 180 / Math.PI).toFixed(2)}) translate(66 0) rotate(90)" font-size="${k > 8 ? 12 : 15}" font-weight="700" class="segn" text-anchor="middle" dominant-baseline="middle">${i + 1}</text>`;
   }
-  return `<svg viewBox="-112 -124 224 238" role="img" aria-label="Spinner wheel"><g class="wg">${p}<circle r="8" fill="#000"/></g><path d="M-10 -122L10 -122L0 -99Z" fill="#e8590c" stroke="#000"/></svg>`;
+  return `<svg viewBox="-112 -124 224 238" role="img" aria-label="Spinner wheel"><g class="wg">${p}<circle r="8" class="hub"/></g><path d="M-10 -122L10 -122L0 -99Z" class="ptr"/></svg>`;
 }
 function spinTo(root, s, live, animate, mode) {
   const its = list(s.items, 12), g = root.querySelector('.wg'), res = root.querySelector('[data-res]');
@@ -207,7 +210,8 @@ export const TYPES = {
   }
 };
 
-for (const T of Object.values(TYPES)) if (T.interactive) T.stage = (s, ctx) => interactiveStage(T, s, ctx);
+TYPES.custom = customType({ F, h1 });
+for (const T of Object.values(TYPES)) if (T.interactive && !T.stage) T.stage = (s, ctx) => interactiveStage(T, s, ctx);
 
 export function newSlide(type) {
   const T = TYPES[type];
@@ -216,7 +220,7 @@ export function newSlide(type) {
 export function renderSlide(s, ctx = {}) {
   const T = TYPES[s && s.type];
   if (!T) return `<div class="slide"><p class="body">Unknown slide type</p></div>`;
-  return `<div class="slide t-${s.type}">${T.stage(s, ctx)}</div>`;
+  return `<div class="slide t-${s.type}" style="${themeStyle(ctx.theme)}">${T.stage(s, ctx)}</div>`;
 }
 // Stable fake responses for previews (seeded by the slide id, so they don't jump while you type)
 export function sampleValues(s, n = 20) {
@@ -228,5 +232,6 @@ export function sampleValues(s, n = 20) {
 export function describe(s, v) {
   if (s.type === 'poll') return list(s.options, 8)[v] ?? '';
   if (s.type === 'rank') return v.map(i => list(s.items, 8)[i]).join(' > ');
+  if (s.type === 'custom') return v;
   return String(v);
 }

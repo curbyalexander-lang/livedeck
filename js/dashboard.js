@@ -1,6 +1,7 @@
 import { esc, newSlide } from './types.js';
+import { EXAMPLES } from './widgets.js';
 
-export function sampleDeck() {
+export function sampleDeck(w = {}) {
   const s = (type, o) => Object.assign(newSlide(type), o);
   return {
     title: 'Sample: Beyond the Slide',
@@ -13,6 +14,8 @@ export function sampleDeck() {
       s('video', { heading: 'Watch together', url: '' }),
       s('spinner', { title: 'Spin for a discussion prompt', items: ['A lesson that flopped', 'A tool you abandoned', 'Your best "aha" moment', 'A student who surprised you', 'Something you would never automate', 'A rule you broke on purpose'] }),
       s('words', { prompt: 'In one word: what should a presentation feel like?' }),
+      ...(w.estimate ? [s('custom', { prompt: 'In what year was the first email sent?', widgetId: w.estimate, config: '{ "answer": 1971, "min": 1950, "max": 2000 }' })] : []),
+      ...(w.timer ? [s('custom', { prompt: '', widgetId: w.timer, config: '{ "seconds": 90, "label": "Turn and talk" }' })] : []),
       s('title', { title: 'Thank you', sub: 'What interaction should we try next?' })
     ]
   };
@@ -37,13 +40,26 @@ export async function mount(root, store) {
     try { const id = await store.createDeck(deck); location.hash = '#edit-' + id; } catch (e) { err(e.message); }
   }
   $('#new').onclick = () => create({ title: 'Untitled presentation', slides: [newSlide('title')] });
-  $('#sample').onclick = () => create(sampleDeck());
+  $('#sample').onclick = async () => {
+    // The sample also adds two example custom widgets to your library.
+    const w = {};
+    try {
+      const have = await store.listItems('widgets');
+      for (const [key, name] of [['estimate', 'Estimation'], ['timer', 'Shared timer']]) {
+        const found = have.find(x => x.name === name); const ex = EXAMPLES.find(x => x.name === name);
+        w[key] = found ? found.id : await store.saveItem('widgets', { name: ex.name, description: ex.description, code: ex.code, config: ex.config });
+      }
+    } catch (e) { }
+    create(sampleDeck(w));
+  };
   $('#imp').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
     try {
       const d = JSON.parse(await f.text());
       if (!d || !Array.isArray(d.slides)) throw new Error('That file is not a LiveDeck export.');
-      create({ title: String(d.title || 'Imported presentation'), slides: d.slides.map(s => ({ ...s, id: newSlide('title').id + Math.random().toString(36).slice(2, 4) })) });
+      const remap = {}; // bring bundled custom widgets into your library
+      for (const [oldId, w] of Object.entries(d.widgets || {})) if (w && typeof w.code === 'string') remap[oldId] = await store.saveItem('widgets', { name: String(w.name || 'Imported widget'), description: String(w.description || ''), code: w.code, config: String(w.config || '') });
+      create({ title: String(d.title || 'Imported presentation'), theme: d.theme || null, slides: d.slides.map(s => ({ ...s, ...(s.type === 'custom' && remap[s.widgetId] ? { widgetId: remap[s.widgetId] } : {}), id: newSlide('title').id + Math.random().toString(36).slice(2, 4) })) });
     } catch (x) { err(x.message); }
   };
 

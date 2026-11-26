@@ -1,5 +1,6 @@
 // Audience phone view. No account needed: Firebase anonymous sign-in gives each phone an id.
 import { TYPES, esc } from './types.js';
+import { normalize, loadFonts, FONTS } from './themes.js';
 
 export async function mount(root, store, arg) {
   const code = String(arg || '').toUpperCase();
@@ -32,15 +33,17 @@ export async function mount(root, store, arg) {
 
   function draw() {
     const s = session.slides[cur], T = TYPES[s && s.type];
-    root.innerHTML = `<div class="phone"><div class="ptop"><span><i class="dot"></i>${esc(session.title || 'Live')}</span><span>${cur + 1} / ${session.slides.length}</span></div>
+    const th = normalize(session.theme); loadFonts(th);
+    root.innerHTML = `<div class="phone" style="--acc:${th.accent};--hf:${esc(FONTS[th.headFont].css)}"><div class="ptop"><span><i class="dot"></i>${esc(session.title || 'Live')}</span><span>${cur + 1} / ${session.slides.length}</span></div>
       <div id="pc"></div><p class="saved" id="saved" aria-live="polite"></p></div>`;
     const pc = root.querySelector('#pc');
     if (!T) { pc.innerHTML = '<p class="look">Eyes on the screen.</p>'; return; }
     if (T.mount) {
       pc.innerHTML = `<h2>${esc(s.prompt || s.title || '')}</h2><div id="ctl"></div>`;
       const ctl = pc.querySelector('#ctl');
-      T.mount(s, ctl, mine[s.id], v => { mine[s.id] = v; send(s.type === 'words' ? `Sent “${v}”. You can change it anytime.` : null); });
-      if (T.after) T.after(s, ctl, { mode: 'phone', live: (session.live || {})[s.id] }, false);
+      const pctx = { mode: 'phone', theme: th, live: (session.live || {})[s.id], value: mine[s.id] };
+      T.mount(s, ctl, mine[s.id], v => { mine[s.id] = v; send(s.type === 'words' ? `Sent “${v}”. You can change it anytime.` : null); }, pctx);
+      if (T.after && s.type !== 'custom') T.after(s, ctl, pctx, false);
       if (T.interactive && session.reveal && session.reveal[s.id]) saved('Results are up on the screen.');
     } else pc.innerHTML = T.phone(s);
   }
@@ -51,10 +54,10 @@ export async function mount(root, store, arg) {
     if (!registered) { registered = true; store.setResponse(code, uid, mine).catch(() => { }); }
     session = s;
     const i = Math.max(0, Math.min(s.current || 0, s.slides.length - 1)), slide = s.slides[i];
-    const nsig = JSON.stringify(slide), live = (s.live || {})[slide.id], n = live ? live.n : null;
+    const nsig = JSON.stringify(slide) + JSON.stringify(s.theme || null), live = (s.live || {})[slide.id], n = live == null ? null : (typeof live === 'string' ? live : live.n);
     if (i !== cur || nsig !== sig) { cur = i; sig = nsig; liveN = n; draw(); return; }
     const T = TYPES[slide.type];
-    if (T && T.after && n !== liveN) { liveN = n; T.after(slide, root.querySelector('#ctl'), { mode: 'phone', live }, true); }
+    if (T && T.after && n !== liveN) { liveN = n; T.after(slide, root.querySelector('#ctl'), { mode: 'phone', live, value: mine[slide.id] }, true); }
     if (T && T.interactive && s.reveal && s.reveal[slide.id]) saved('Results are up on the screen.');
   });
 

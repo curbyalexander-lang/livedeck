@@ -45,6 +45,13 @@ async function firebaseStore() {
     watchSession: (code, cb) => F.onSnapshot(F.doc(db, 'sessions', code), d => cb(d.exists() ? d.data() : null), () => cb(null)),
     setResponse: (code, uid, r) => F.setDoc(F.doc(db, 'sessions', code, 'responses', uid), clean({ r, updatedAt: Date.now() })),
     watchResponses: (code, cb) => F.onSnapshot(F.collection(db, 'sessions', code, 'responses'), s => cb(s.docs.map(d => ({ uid: d.id, ...d.data() }))), () => { }),
+    // Your libraries of saved themes and custom widgets (kind = 'themes' or 'widgets')
+    async listItems(kind) { const s = await F.getDocs(F.query(F.collection(db, kind), F.where('owner', '==', user.uid))); return s.docs.map(withId); },
+    async saveItem(kind, item) {
+      const ref = item.id ? F.doc(db, kind, item.id) : F.doc(F.collection(db, kind));
+      const { id, ...rest } = item; await F.setDoc(ref, clean({ ...rest, owner: user.uid, updatedAt: Date.now() })); return ref.id;
+    },
+    deleteItem: (kind, id) => F.deleteDoc(F.doc(db, kind, id)),
     canUpload: !!storage,
     async upload(file) {
       const r = S.ref(storage, `media/${user.uid}/${Date.now()}-${file.name.replace(/[^\w.-]/g, '_')}`);
@@ -80,6 +87,9 @@ function localStore() {
     watchSession: (code, cb) => watch('s:' + code, () => cb(get('s:' + code))),
     async setResponse(code, uid, r) { const all = get('r:' + code) || {}; all[uid] = clean({ r, updatedAt: Date.now() }); set('r:' + code, all); },
     watchResponses: (code, cb) => watch('r:' + code, () => cb(Object.entries(get('r:' + code) || {}).map(([uid, v]) => ({ uid, ...v })))),
+    listItems: async kind => Object.values(get('lib:' + kind) || {}),
+    async saveItem(kind, item) { const all = get('lib:' + kind) || {}; const id = item.id || 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); all[id] = clean({ ...item, id, owner: 'local', updatedAt: Date.now() }); set('lib:' + kind, all); return id; },
+    async deleteItem(kind, id) { const all = get('lib:' + kind) || {}; delete all[id]; set('lib:' + kind, all); },
     canUpload: true,
     upload: file => new Promise((res, rej) => {
       if (file.size > 1.5e6) return rej(new Error('In local mode, uploads must be under 1.5 MB. Paste a link instead, or connect Firebase.'));

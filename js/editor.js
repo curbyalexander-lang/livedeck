@@ -1,18 +1,24 @@
 // Authoring tool: slide rail (left), live preview (center), properties (right). Autosaves.
 import { TYPES, renderSlide, newSlide, esc, sampleValues } from './types.js';
+import { normalize, loadFonts, DEFAULT_THEME } from './themes.js';
+import { openThemePanel } from './themepanel.js';
+import { openWidgetLib } from './widgetlib.js';
 
 export async function mount(root, store, id) {
   const deck = await store.getDeck(id);
   if (!deck) { root.innerHTML = `<div class="page"><h1>Presentation not found</h1><p><a class="btn" href="#decks">Back</a></p></div>`; return; }
   deck.id = id; deck.slides = Array.isArray(deck.slides) ? deck.slides : [];
   if (!deck.slides.length) deck.slides.push(newSlide('title'));
-  let sel = 0, sample = true, timer = 0, saving = Promise.resolve(), dragFrom = -1;
+  deck.theme = normalize(deck.theme || DEFAULT_THEME); loadFonts(deck.theme);
+  let sel = 0, sample = true, timer = 0, saving = Promise.resolve(), dragFrom = -1, widgets = {};
+  const setWidgets = arr => { widgets = {}; (arr || []).forEach(w => widgets[w.id] = w); };
+  try { setWidgets(await store.listItems('widgets')); } catch (e) { }
 
   root.innerHTML = `<div class="ed">
   <header class="edbar"><a class="btn ghost" href="#decks">← Presentations</a>
     <input id="dtitle" class="dtitle" aria-label="Presentation title" maxlength="120">
     <span class="status" id="status" aria-live="polite">Saved</span><span class="grow"></span>
-    <button class="btn" id="export">Export JSON</button><button class="btn primary" id="present">Present</button></header>
+    <button class="btn" id="theme">Theme</button><button class="btn" id="wlib">Widgets</button><button class="btn" id="export">Export JSON</button><button class="btn primary" id="present">Present</button></header>
   <aside class="rail"><ol id="thumbs" class="thumbs"></ol><button class="btn add" id="add">+ Add slide</button></aside>
   <main class="canvas"><div class="ctop"><span id="slabel" class="muted"></span>
     <label class="chk"><input type="checkbox" id="sample" checked> Preview with sample results</label></div>
@@ -33,7 +39,7 @@ export async function mount(root, store, id) {
   }
 
   // ---- thumbnails ----
-  const ctxFor = (s, mode) => ({ mode, thumb: mode === 'thumb', values: sample ? sampleValues(s) : [], reveal: sample, live: sample && s.type === 'spinner' ? { idx: 0, n: 1 } : null });
+  const ctxFor = (s, mode) => ({ mode, theme: deck.theme, widgets, thumb: mode === 'thumb', values: sample ? sampleValues(s) : [], reveal: sample, live: sample && s.type === 'spinner' ? { idx: 0, n: 1 } : null });
   function thumbHtml(s, i) { return `<span class="tn">${i + 1}</span><div class="tb">${renderSlide(s, ctxFor(s, 'thumb'))}</div>`; }
   function drawThumbs() {
     $('#thumbs').innerHTML = deck.slides.map((s, i) => `<li draggable="true" data-i="${i}" class="${i === sel ? 'on' : ''}" tabindex="0" aria-label="Slide ${i + 1}: ${esc(TYPES[s.type]?.label || s.type)}">${thumbHtml(s, i)}</li>`).join('');
@@ -80,6 +86,11 @@ export async function mount(root, store, id) {
     else if (f.type === 'media') input = `<div class="mediaf"><input id="${id}" data-k="${f.k}" type="text" inputmode="url" placeholder="https://…  or  media/photo.jpg" value="${esc(String(v || '').startsWith('data:') ? '' : v)}">
       ${store.canUpload ? `<label class="btn small">Upload<input type="file" accept="image/*" data-up="${f.k}" hidden></label>` : ''}</div>
       ${String(v || '').startsWith('data:') ? '<small>Uploaded image stored in this browser. <button class="linkbtn" data-clear="' + f.k + '">Remove</button></small>' : ''}<small class="uperr" data-uperr="${f.k}"></small>`;
+    else if (f.type === 'widget') {
+      const ws = Object.values(widgets).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      input = `<select id="${id}" data-k="${f.k}"><option value="">Choose a widget…</option>${ws.map(w => `<option value="${esc(w.id)}"${w.id === v ? ' selected' : ''}>${esc(w.name || 'Untitled')}</option>`).join('')}</select>
+      <div class="wact"><button class="btn small" data-act="wedit">${v && widgets[v] ? 'Edit this widget' : 'Open widget library'}</button></div>${v && !widgets[v] ? '<small class="uperr">This widget is missing from your library.</small>' : ''}`;
+    }
     else input = `<input id="${id}" data-k="${f.k}" type="text" value="${esc(v)}">`;
     return `<div class="field"><label for="${id}">${esc(f.label)}</label>${input}${hint}</div>`;
   }
@@ -99,6 +110,7 @@ export async function mount(root, store, id) {
       if (s.type === 'slider') { if (k === 'min' && s.max <= s.min) s.max = s.min + 1; if (k === 'max' && s.max <= s.min) s.min = s.max - 1; if (s.max - s.min > 20) { if (k === 'min') s.max = s.min + 20; else s.min = s.max - 20; } }
     } else s[k] = el.value;
     drawPreview(); updateThumb(); queue();
+    if (f.type === 'widget') drawProps();
   }
   const props = $('#props');
   props.oninput = e => { const k = e.target.dataset.k; if (k && e.target.type !== 'file') setField(k, e.target); };
@@ -113,6 +125,7 @@ export async function mount(root, store, id) {
     const c = e.target.closest('[data-clear]'); if (c) { deck.slides[sel][c.dataset.clear] = ''; drawProps(); drawPreview(); updateThumb(); queue(); return; }
     const b = e.target.closest('[data-act]'); if (!b) return;
     const a = b.dataset.act, S = deck.slides;
+    if (a === 'wedit') return openLib(S[sel].widgetId);
     if (a === 'up' && sel > 0) { [S[sel - 1], S[sel]] = [S[sel], S[sel - 1]]; sel--; }
     else if (a === 'down' && sel < S.length - 1) { [S[sel + 1], S[sel]] = [S[sel], S[sel + 1]]; sel++; }
     else if (a === 'dup') { const copy = JSON.parse(JSON.stringify(S[sel])); copy.id = newSlide(copy.type).id; S.splice(sel + 1, 0, copy); sel++; }
@@ -139,9 +152,18 @@ export async function mount(root, store, id) {
   const onKey = e => { if (e.key === 'Escape' && !$('#picker').hidden) closePicker(); };
   document.addEventListener('keydown', onKey);
 
+  // ---- theme + widget library ----
+  $('#theme').onclick = () => openThemePanel({ store, deck, slide: () => deck.slides[sel], ctxFor, onChange: () => { queue(); drawPreview(); drawThumbs(); } });
+  function openLib(startId) {
+    openWidgetLib({ store, theme: deck.theme, startId, onSaved: arr => { setWidgets(arr); drawAll(); } });
+  }
+  $('#wlib').onclick = () => openLib();
+
   // ---- export / present ----
   $('#export').onclick = () => {
     const { id: _i, owner: _o, ...rest } = deck;
+    rest.widgets = {}; // bundle the custom widgets this deck uses, so the file works on its own
+    deck.slides.forEach(sl => { const w = sl.type === 'custom' && widgets[sl.widgetId]; if (w) rest.widgets[w.id] = { name: w.name, description: w.description || '', code: w.code, config: w.config || '' }; });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([JSON.stringify(rest, null, 2)], { type: 'application/json' }));
     a.download = (deck.title || 'presentation').replace(/[^\w-]+/g, '_') + '.json'; a.click();
