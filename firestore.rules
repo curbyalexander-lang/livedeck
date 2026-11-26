@@ -7,7 +7,7 @@ service cloud.firestore {
     function isPresenter() {
       return request.auth != null
         && request.auth.token.email_verified == true
-        && request.auth.token.email in ['YOUR_EMAIL@tcu.edu'];
+        && request.auth.token.email in ['curbyalexander@gmail.com'];
     }
     function session(code) {
       return get(/databases/$(database)/documents/sessions/$(code)).data;
