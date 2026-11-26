@@ -1,6 +1,6 @@
 // Data layer. The rest of the app only talks to the object returned by getStore(),
 // so it works the same whether it's backed by Firebase or by this browser (local mode).
-import { FIREBASE_CONFIG as CFG } from './config.js?v=2.0';
+import { FIREBASE_CONFIG as CFG } from './config.js?v=2.2';
 
 const FIREBASE_VERSION = '10.12.2';
 const configured = !!(CFG && CFG.apiKey && !/^PASTE/.test(CFG.apiKey) && CFG.projectId);
@@ -44,6 +44,9 @@ async function firebaseStore() {
     updateSession: (code, patch) => F.updateDoc(F.doc(db, 'sessions', code), clean(patch)),
     watchSession: (code, cb) => F.onSnapshot(F.doc(db, 'sessions', code), d => cb(d.exists() ? d.data() : null), () => cb(null)),
     setResponse: (code, uid, r) => F.setDoc(F.doc(db, 'sessions', code, 'responses', uid), clean({ r, updatedAt: Date.now() })),
+    // Presenter-only shared state for a session (drawings, timer, remote heartbeat). Phones never read it.
+    setStage: (code, patch) => F.setDoc(F.doc(db, 'sessions', code, 'stage', 'main'), clean(patch), { merge: true }),
+    watchStage: (code, cb) => F.onSnapshot(F.doc(db, 'sessions', code, 'stage', 'main'), d => cb(d.exists() ? d.data() : {}), () => { }),
     watchResponses: (code, cb) => F.onSnapshot(F.collection(db, 'sessions', code, 'responses'), s => cb(s.docs.map(d => ({ uid: d.id, ...d.data() }))), () => { }),
     // Your libraries of saved themes and custom widgets (kind = 'themes' or 'widgets')
     async listItems(kind) { const s = await F.getDocs(F.query(F.collection(db, kind), F.where('owner', '==', user.uid))); return s.docs.map(withId); },
@@ -86,6 +89,12 @@ function localStore() {
     async updateSession(code, patch) { const s = get('s:' + code); if (s) set('s:' + code, clean({ ...s, ...patch })); },
     watchSession: (code, cb) => watch('s:' + code, () => cb(get('s:' + code))),
     async setResponse(code, uid, r) { const all = get('r:' + code) || {}; all[uid] = clean({ r, updatedAt: Date.now() }); set('r:' + code, all); },
+    async setStage(code, patch) { // merges one level deep, like Firestore's merge
+      const cur = get('st:' + code) || {};
+      for (const [k, v] of Object.entries(clean(patch))) cur[k] = v && typeof v === 'object' && !Array.isArray(v) && cur[k] && typeof cur[k] === 'object' ? { ...cur[k], ...v } : v;
+      set('st:' + code, cur);
+    },
+    watchStage: (code, cb) => watch('st:' + code, () => cb(get('st:' + code) || {})),
     watchResponses: (code, cb) => watch('r:' + code, () => cb(Object.entries(get('r:' + code) || {}).map(([uid, v]) => ({ uid, ...v })))),
     listItems: async kind => Object.values(get('lib:' + kind) || {}),
     async saveItem(kind, item) { const all = get('lib:' + kind) || {}; const id = item.id || 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); all[id] = clean({ ...item, id, owner: 'local', updatedAt: Date.now() }); set('lib:' + kind, all); return id; },

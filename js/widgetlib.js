@@ -1,9 +1,9 @@
 // Widget library: write, test, and save your own interactive widgets.
 // The test area runs the widget exactly as it will run live: a big-screen frame plus test phones,
 // with answers from the test phones flowing to the big screen.
-import { EXAMPLES, widgetDoc, attach, send, parseConfig } from './widgets.js?v=2.0';
-import { themeStyle } from './themes.js?v=2.0';
-import { esc } from './util.js?v=2.0';
+import { EXAMPLES, widgetDoc, attach, send, parseConfig } from './widgets.js?v=2.2';
+import { themeStyle } from './themes.js?v=2.2';
+import { esc } from './util.js?v=2.2';
 
 export async function openWidgetLib({ store, theme, startId, onSaved }) {
   let list = []; try { list = await store.listItems('widgets'); } catch (e) { }
@@ -31,7 +31,7 @@ export async function openWidgetLib({ store, theme, startId, onSaved }) {
       <div class="field"><label for="w-desc">Description</label><input id="w-desc" value="${esc(cur.description || '')}" maxlength="140"></div></div>
       <div class="field"><label for="w-code">Code <small>(HTML with &lt;style&gt; and &lt;script&gt;; uses window.LiveDeck. See README.)</small></label><textarea id="w-code" class="code" rows="16" spellcheck="false">${esc(cur.code)}</textarea></div>
       <div class="field"><label for="w-config">Test settings <small>(what a slide's Settings box would pass in as LiveDeck.config)</small></label><textarea id="w-config" class="code" rows="2" spellcheck="false">${esc(cur.config || '')}</textarea></div>
-      <div class="wact"><button class="btn" data-a="run">Run test</button><button class="btn primary" data-a="save">Save</button><button class="btn ghost" data-a="del"${cur.id ? '' : ' hidden'}>Delete</button><span class="muted small" id="wmsg" aria-live="polite"></span></div>
+      <div class="wact"><button class="btn" data-a="run">Run test</button><button class="btn primary" data-a="save">Save</button><button class="btn ghost" data-a="del"${cur.id ? '' : ' hidden'}>Delete</button><button class="btn ghost" data-a="examples">Start from an example</button><span class="muted small" id="wmsg" aria-live="polite"></span></div>
       <div class="wtest"><div class="wstage"><p class="lbl2">Big screen</p><div class="slide" style="${themeStyle(theme)}"><div class="wbox" id="w-stage"></div></div>
         <div class="wact"><label class="chk"><input type="checkbox" id="w-reveal"${reveal ? ' checked' : ''}> Results revealed</label><button class="btn small" data-a="clear">Clear test answers</button><span class="muted small" id="w-count"></span></div></div>
         <div class="wphones"><p class="lbl2">Test phones <button class="btn small" data-a="addphone"${phones >= 3 ? ' disabled' : ''}>+ Phone</button></p><div class="prow" id="w-phones"></div></div></div>`;
@@ -55,6 +55,7 @@ export async function openWidgetLib({ store, theme, startId, onSaved }) {
   function pushPhones() { wrap.querySelectorAll('#w-phones iframe').forEach((f, i) => send(f, { value: answers[i] ? JSON.parse(answers[i]) : null, live })); }
   function count() { const e = $('#w-count'); if (e) e.textContent = `${Object.keys(answers).length} test answer(s)`; }
   function readForm() { if (!cur || !$('#w-code')) return; cur.name = $('#w-name').value.trim() || 'Untitled widget'; cur.description = $('#w-desc').value.trim(); cur.code = $('#w-code').value; cur.config = $('#w-config').value; }
+  function newBlank() { const x = EXAMPLES[0]; openItem({ name: 'My widget', description: '', code: x.code, config: '' }); dirty = true; status('New widget: not saved yet'); setTimeout(() => $('#w-name') && $('#w-name').select(), 0); }
   function openItem(item) { cur = { ...item }; answers = {}; live = null; reveal = false; phones = 1; dirty = false; drawEditor(); }
 
   wrap.addEventListener('input', e => {
@@ -72,7 +73,11 @@ export async function openWidgetLib({ store, theme, startId, onSaved }) {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const a = b.dataset.a;
     if (a === 'close') return close();
-    if (a === 'new') return drawStart();
+    if (a === 'new') { // open a blank widget straight away
+      if (dirty && !b.dataset.warned) { b.dataset.warned = '1'; status('You have unsaved changes. Save, or click + New widget again to discard them.'); setTimeout(() => delete b.dataset.warned, 4000); return; }
+      delete b.dataset.warned; return newBlank();
+    }
+    if (a === 'examples') return drawStart();
     if (a === 'run') { readForm(); run(); return; }
     if (a === 'clear') { answers = {}; live = null; run(); return; }
     if (a === 'addphone') { readForm(); phones = Math.min(3, phones + 1); drawEditor(); return; }

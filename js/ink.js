@@ -16,18 +16,21 @@ const ICONS = {
   draw: icon('M4 20l4-1 11-11-3-3L5 16l-1 4z')
 };
 
-export function createInk(host, { storageKey } = {}) {
+export function createInk(host, { storageKey, onCommit, onLive, barParent, toggleButton = true } = {}) {
+  // onCommit(slideId, strokes): a slide's ink changed (sync it).  onLive({slide, cur, laser}): pen moving (throttled).
   // host: an element positioned over the slide (same size). We add a canvas and a toolbar to it.
   const canvas = document.createElement('canvas'); canvas.className = 'ink';
   const bar = document.createElement('div'); bar.className = 'inkbar';
   const toggleBtn = document.createElement('button'); toggleBtn.className = 'inktoggle'; toggleBtn.innerHTML = ICONS.draw; toggleBtn.title = 'Draw (D)'; toggleBtn.setAttribute('aria-label', 'Draw on slide (D)');
-  host.append(canvas, bar, toggleBtn);
+  host.append(canvas); (barParent || host).append(bar); if (barParent) bar.classList.add('flat'); if (toggleButton) host.append(toggleBtn);
   const g = canvas.getContext('2d');
 
   let strokes = {}, history = {}, slideId = null, on = false, tool = 'pen', color = COLORS[0], size = 'M';
-  let cur = null, penSeen = false, laser = [], raf = 0, W = 1, H = 1, dpr = 1;
+  let cur = null, penSeen = false, laser = [], raf = 0, W = 1, H = 1, dpr = 1, rcur = null, lastLive = 0;
   try { const saved = storageKey && JSON.parse(sessionStorage.getItem(storageKey)); if (saved) strokes = saved; } catch (e) { }
   const persist = () => { try { storageKey && sessionStorage.setItem(storageKey, JSON.stringify(strokes)); } catch (e) { } };
+  const commit = () => { persist(); onCommit && slideId != null && onCommit(slideId, list()); };
+  const sendLive = (o, force) => { if (!onLive || slideId == null) return; const n = performance.now(); if (!force && n - lastLive < 120) return; lastLive = n; onLive({ slide: slideId, ...o }); };
 
   bar.innerHTML = `<div class="ig">${['pen', 'hl', 'laser', 'eraser'].map(t => `<button data-tool="${t}" title="${{ pen: 'Pen', hl: 'Highlighter', laser: 'Laser pointer', eraser: 'Eraser' }[t]}" aria-label="${{ pen: 'Pen', hl: 'Highlighter', laser: 'Laser pointer', eraser: 'Eraser' }[t]}">${ICONS[t]}</button>`).join('')}</div>
     <div class="ig">${COLORS.map(c => `<button data-color="${c}" class="sw" style="--c:${c}" aria-label="Colour ${c}"></button>`).join('')}</div>
@@ -48,7 +51,7 @@ export function createInk(host, { storageKey } = {}) {
     if (b.dataset.color) { color = b.dataset.color; if (tool === 'eraser' || tool === 'laser') tool = 'pen'; }
     if (b.dataset.size) size = b.dataset.size;
     if (b.dataset.a === 'undo') undo();
-    if (b.dataset.a === 'clear') { const l = list(); if (l.length) { snapshot(); strokes[slideId] = []; persist(); redraw(); } }
+    if (b.dataset.a === 'clear') { const l = list(); if (l.length) { snapshot(); strokes[slideId] = []; commit(); redraw(); } }
     if (b.dataset.a === 'done') setOn(false);
     syncBar();
   });
@@ -56,7 +59,7 @@ export function createInk(host, { storageKey } = {}) {
 
   const list = () => slideId == null ? [] : (strokes[slideId] ||= []);
   const snapshot = () => { (history[slideId] ||= []).push(JSON.stringify(list())); if (history[slideId].length > 50) history[slideId].shift(); };
-  function undo() { const h = history[slideId]; if (!h || !h.length) return; strokes[slideId] = JSON.parse(h.pop()); persist(); redraw(); }
+  function undo() { const h = history[slideId]; if (!h || !h.length) return; strokes[slideId] = JSON.parse(h.pop()); commit(); redraw(); }
 
   function resize() {
     const r = host.getBoundingClientRect(); dpr = window.devicePixelRatio || 1;
@@ -84,7 +87,7 @@ export function createInk(host, { storageKey } = {}) {
   }
   function redraw() {
     g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-    list().forEach(drawStroke); if (cur) drawStroke(cur);
+    list().forEach(drawStroke); if (rcur) drawStroke(rcur); if (cur) drawStroke(cur);
     const now = performance.now(); laser = laser.filter(l => now - l.t < 700);
     if (laser.length) {
       g.lineCap = 'round'; g.lineJoin = 'round';
@@ -103,7 +106,7 @@ export function createInk(host, { storageKey } = {}) {
 
   function eraseAt(x, y) {
     const rr = 0.018, l = list(); const keep = l.filter(s => !s.pts.some(p => Math.hypot((p[0] - x) * W, (p[1] - y) * H) < rr * W));
-    if (keep.length !== l.length) { strokes[slideId] = keep; persist(); redraw(); return true; }
+    if (keep.length !== l.length) { strokes[slideId] = keep; redraw(); return true; }
     return false;
   }
 
@@ -114,12 +117,12 @@ export function createInk(host, { storageKey } = {}) {
     if (penSeen && e.pointerType === 'touch') return; // palm rejection
     e.preventDefault(); canvas.setPointerCapture(e.pointerId);
     const p = pt(e);
-    if (tool === 'laser') { laser.push({ x: p[0], y: p[1], t: performance.now() }); if (!raf) loop(); cur = { laser: true, id: e.pointerId }; return; }
+    if (tool === 'laser') { laser.push({ x: p[0], y: p[1], t: performance.now() }); if (!raf) loop(); cur = { laser: true, id: e.pointerId }; sendLive({ cur: null, laser: [p[0], p[1]] }, true); return; }
     if (tool === 'eraser') { snapshot(); erasedThisDrag = eraseAt(p[0], p[1]); cur = { erase: true, id: e.pointerId }; return; }
     cur = { tool, color, w: SIZES[size], pts: [p], id: e.pointerId }; redraw();
   });
   canvas.addEventListener('pointermove', e => {
-    if (on && tool === 'laser' && e.pointerType !== 'touch' && !cur) { const p = pt(e); laser.push({ x: p[0], y: p[1], t: performance.now() }); if (!raf) loop(); return; } // mouse hover laser
+    if (on && tool === 'laser' && e.pointerType !== 'touch' && !cur) { const p = pt(e); laser.push({ x: p[0], y: p[1], t: performance.now() }); if (!raf) loop(); sendLive({ cur: null, laser: [p[0], p[1]] }); return; } // mouse hover laser
     if (!cur || cur.id !== e.pointerId) return;
     const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
     for (const ev of (evs.length ? evs : [e])) {
@@ -128,12 +131,14 @@ export function createInk(host, { storageKey } = {}) {
       else if (cur.erase) erasedThisDrag = eraseAt(p[0], p[1]) || erasedThisDrag;
       else { const last = cur.pts[cur.pts.length - 1]; if (Math.hypot((p[0] - last[0]) * W, (p[1] - last[1]) * H) > 0.8) cur.pts.push(p.map(v => Math.round(v * 10000) / 10000)); }
     }
-    if (!cur.laser && !cur.erase) redraw();
+    if (cur.laser) { const l = laser[laser.length - 1]; if (l) sendLive({ cur: null, laser: [l.x, l.y] }); }
+    else if (!cur.erase) { redraw(); const { id, ...st } = cur; sendLive({ cur: st, laser: null }); }
   });
   const end = e => {
     if (!cur || cur.id !== e.pointerId) return;
-    if (cur.erase) { if (!erasedThisDrag) history[slideId].pop(); }
-    else if (!cur.laser) { const { id, ...s } = cur; snapshot(); list().push(s); persist(); }
+    if (cur.erase) { if (!erasedThisDrag) history[slideId].pop(); else commit(); }
+    else if (!cur.laser) { const { id, ...s } = cur; snapshot(); list().push(s); commit(); }
+    if (!cur.erase) sendLive({ cur: null, laser: null }, true);
     cur = null; redraw();
   };
   canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
@@ -142,7 +147,15 @@ export function createInk(host, { storageKey } = {}) {
   syncBar();
 
   return {
-    setSlide(id) { slideId = id; cur = null; redraw(); },
+    setSlide(id) { slideId = id; cur = null; rcur = null; redraw(); },
+    // Ink drawn on another device for a slide (replaces what we have)
+    setStrokes(id, arr) { strokes[id] = Array.isArray(arr) ? arr : []; persist(); if (id === slideId) redraw(); },
+    // Another device's pen in motion: its unfinished stroke and/or laser point
+    setRemote(o) {
+      rcur = o && o.slide === slideId && o.cur && Array.isArray(o.cur.pts) ? o.cur : null;
+      if (o && o.slide === slideId && Array.isArray(o.laser)) { laser.push({ x: +o.laser[0], y: +o.laser[1], t: performance.now() }); if (!raf) loop(); }
+      redraw();
+    },
     toggle() { setOn(!on); },
     get active() { return on; },
     key(e) { // returns true if the key was handled

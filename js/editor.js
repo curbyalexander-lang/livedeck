@@ -1,9 +1,9 @@
 // Authoring tool: slide rail (left), live preview (center), properties (right). Autosaves.
-import { TYPES, renderSlide, newSlide, esc, sampleValues } from './types.js?v=2.0';
-import { normalize, loadFonts, DEFAULT_THEME } from './themes.js?v=2.0';
-import { openThemePanel } from './themepanel.js?v=2.0';
-import { openWidgetLib } from './widgetlib.js?v=2.0';
-import { VERSION } from './version.js?v=2.0';
+import { TYPES, renderSlide, newSlide, esc, sampleValues } from './types.js?v=2.2';
+import { normalize, loadFonts, DEFAULT_THEME } from './themes.js?v=2.2';
+import { openThemePanel } from './themepanel.js?v=2.2';
+import { openWidgetLib } from './widgetlib.js?v=2.2';
+import { VERSION } from './version.js?v=2.2';
 
 export async function mount(root, store, id) {
   const deck = await store.getDeck(id);

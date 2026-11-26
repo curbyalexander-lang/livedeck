@@ -1,6 +1,6 @@
-import { esc, newSlide } from './types.js?v=2.0';
-import { EXAMPLES } from './widgets.js?v=2.0';
-import { VERSION } from './version.js?v=2.0';
+import { esc, newSlide } from './types.js?v=2.2';
+import { EXAMPLES } from './widgets.js?v=2.2';
+import { VERSION } from './version.js?v=2.2';
 
 export function sampleDeck(w = {}) {
   const s = (type, o) => Object.assign(newSlide(type), o);

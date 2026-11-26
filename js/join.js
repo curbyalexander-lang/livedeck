@@ -1,6 +1,6 @@
 // Audience phone view. No account needed: Firebase anonymous sign-in gives each phone an id.
-import { TYPES, esc } from './types.js?v=2.0';
-import { normalize, loadFonts, FONTS } from './themes.js?v=2.0';
+import { TYPES, esc } from './types.js?v=2.2';
+import { normalize, loadFonts, FONTS } from './themes.js?v=2.2';
 
 export async function mount(root, store, arg) {
   const code = String(arg || '').toUpperCase();

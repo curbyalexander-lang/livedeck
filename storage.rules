@@ -1,0 +1,16 @@
+rules_version = '2';
+// Optional: only needed if you turn on Firebase Storage for image uploads.
+// Paste into Firebase console → Storage → Rules. Use the same email as in firestore.rules.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /media/{uid}/{file} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['YOUR_EMAIL@tcu.edu']
+        && request.resource.size < 15 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

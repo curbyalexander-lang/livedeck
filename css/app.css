@@ -252,3 +252,56 @@ canvas.ink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
 .inkbar .sw.on{background:#e6e6e6;color:inherit;border-color:#000}
 .inkbar .done{grid-column:1/-1;width:auto;background:#000;color:#fff}
 @media(max-height:560px){.inkbar .ig{grid-template-columns:repeat(4,40px)}}
+
+/* display: remote button + dialog */
+.rchip{font-size:13px;color:#2b6a36;border:1px solid #9fd0a8;border-radius:99px;padding:3px 10px;white-space:nowrap}
+.rbox{max-width:760px}
+.rmgrid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:22px;align-items:start;margin-top:10px}
+.rbox .qr{width:220px}.rbox .qr svg{width:100%;height:auto;display:block}
+.rurl{overflow-wrap:anywhere}
+@media(max-width:620px){.rmgrid{grid-template-columns:1fr}.rbox .qr{width:180px}}
+
+/* presenter remote (phone / iPad) */
+.remote{min-height:100vh;background:#f4f5f7;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-content:start;padding:10px 12px calc(160px + env(safe-area-inset-bottom));max-width:1500px;margin:0 auto}
+.rtop{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rtitle{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55vw}
+.chip{font-size:13px;background:#fff;border:1px solid var(--line);border-radius:99px;padding:4px 10px;white-space:nowrap}
+.rtimer{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.relapsed{font-size:44px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.rsub{font-size:13px;color:var(--mute);margin-top:4px}
+.rtimer.warn .rsub{color:#a35f00;font-weight:700}
+.rtimer.over .relapsed,.rtimer.over .rsub{color:#c62828;font-weight:700}
+.rtright{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.rclock{font-size:15px;color:var(--mute);font-variant-numeric:tabular-nums}
+.rtbtns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tsel{min-height:36px;border:1px solid #bdbdbd;border-radius:8px;padding:0 6px;background:#fff;font-size:14px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.rlbl{display:flex;justify-content:space-between;gap:8px;margin:0 0 6px;font-size:13px;font-weight:700}
+.rlbl .muted{font-weight:400}
+.rprev{position:relative;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.2);touch-action:pan-y}
+.rnext{max-width:440px}
+.rnext .slide{border-radius:6px;box-shadow:0 0 0 1px var(--line)}
+.rend{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:#e4e6ea;border-radius:6px;color:var(--mute)}
+.rnotext{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:19px;line-height:1.45;white-space:pre-wrap;max-height:40vh;overflow:auto}
+.rdock{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.97);border-top:1px solid var(--line);padding:8px 12px calc(8px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:5}
+.rtools{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.rtools .btn{flex:none}
+.rnav{display:grid;grid-template-columns:1fr 2fr;gap:8px}
+.rnav .btn{min-height:62px;font-size:21px;font-weight:700}
+.rended{background:#fff3cd;padding:8px 12px;border-radius:8px;margin:0 0 8px}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+.rgi{position:relative;padding:0;border:3px solid transparent;border-radius:6px;background:none;overflow:hidden;box-shadow:0 0 0 1px var(--line)}
+.rgi.on{border-color:var(--acc)}
+.rgi span{position:absolute;left:4px;top:4px;z-index:1;background:rgba(0,0,0,.7);color:#fff;font-size:12px;padding:1px 6px;border-radius:4px}
+.rgi .slide{pointer-events:none}
+.inkbar.flat{position:static;transform:none;flex-direction:row;flex-wrap:wrap;margin-top:8px;max-height:none;box-shadow:none;border-radius:12px}
+.inkbar.flat .ig{display:flex;gap:4px}
+.inkbar.flat .done{width:auto;padding:0 14px}
+@media(min-width:900px) and (orientation:landscape){
+  .remote{grid-template-columns:minmax(0,1.75fr) minmax(300px,1fr);grid-template-areas:"top top" "cur timer" "cur next" "cur notes";padding-bottom:110px}
+  .rtop{grid-area:top}.rtimer{grid-area:timer}.rcur{grid-area:cur}.rnext{grid-area:next;max-width:none}.rnotes{grid-area:notes}
+  .rnotext{max-height:none;min-height:24vh}
+  .rdock{flex-direction:row;align-items:center}
+  .rtools{flex:1}
+  .rnav{width:440px;flex:none}
+}
