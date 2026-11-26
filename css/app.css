@@ -337,3 +337,6 @@ canvas.ink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
 .pbtns{display:flex;flex-direction:column;gap:4px}
 .pbtns .btn.small{min-height:30px;padding:0 8px}
 .picrow .chk{font-weight:400;white-space:nowrap}
+
+/* Hide the gray "add something here" placeholder boxes on empty slides */
+.ph:not(.vidph){display:none}
