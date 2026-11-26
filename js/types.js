@@ -15,9 +15,9 @@
 // To invent a new interaction, add one more entry here. Nothing else changes.
 // =====================================================================
 
-import { esc, safeUrl } from './util.js';
-import { themeStyle } from './themes.js';
-import { customType } from './widgets.js';
+import { esc, safeUrl } from './util.js?v=2.0';
+import { themeStyle } from './themes.js?v=2.0';
+import { customType } from './widgets.js?v=2.0';
 export { esc, safeUrl };
 const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const F = (k, label, type = 'text', hint = '', opts = null) => ({ k, label, type, hint, opts });

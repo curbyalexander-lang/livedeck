@@ -1,7 +1,7 @@
 // Themes: colours, fonts, and an optional background image applied to every slide in a deck.
 // A theme is plain data, so presets, your saved themes, and a deck's own theme all look alike:
 //   { id, name, bg, ink, accent, highlight, headFont, bodyFont, bgImage, dim }
-import { esc, safeUrl } from './util.js';
+import { esc, safeUrl } from './util.js?v=2.0';
 
 export const FONTS = {
   // system fonts (always available)

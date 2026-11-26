@@ -1,7 +1,7 @@
 // Theme picker and editor (opened from the authoring tool's Theme button).
-import { PRESETS, FONTS, normalize, swatch, loadFonts, DEFAULT_THEME } from './themes.js';
-import { renderSlide, TYPES } from './types.js';
-import { esc } from './util.js';
+import { PRESETS, FONTS, normalize, swatch, loadFonts, DEFAULT_THEME } from './themes.js?v=2.0';
+import { renderSlide, TYPES } from './types.js?v=2.0';
+import { esc } from './util.js?v=2.0';
 
 const six = c => /^#[0-9a-f]{3}$/i.test(c) ? '#' + [...c.slice(1)].map(x => x + x).join('') : c;
 const fontOpts = sel => {

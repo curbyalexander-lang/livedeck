@@ -1,8 +1,9 @@
 // Authoring tool: slide rail (left), live preview (center), properties (right). Autosaves.
-import { TYPES, renderSlide, newSlide, esc, sampleValues } from './types.js';
-import { normalize, loadFonts, DEFAULT_THEME } from './themes.js';
-import { openThemePanel } from './themepanel.js';
-import { openWidgetLib } from './widgetlib.js';
+import { TYPES, renderSlide, newSlide, esc, sampleValues } from './types.js?v=2.0';
+import { normalize, loadFonts, DEFAULT_THEME } from './themes.js?v=2.0';
+import { openThemePanel } from './themepanel.js?v=2.0';
+import { openWidgetLib } from './widgetlib.js?v=2.0';
+import { VERSION } from './version.js?v=2.0';
 
 export async function mount(root, store, id) {
   const deck = await store.getDeck(id);
@@ -17,7 +18,7 @@ export async function mount(root, store, id) {
   root.innerHTML = `<div class="ed">
   <header class="edbar"><a class="btn ghost" href="#decks">← Presentations</a>
     <input id="dtitle" class="dtitle" aria-label="Presentation title" maxlength="120">
-    <span class="status" id="status" aria-live="polite">Saved</span><span class="grow"></span>
+    <span class="status" id="status" aria-live="polite">Saved</span><span class="status" title="LiveDeck version">v${VERSION}</span><span class="grow"></span>
     <button class="btn" id="theme">Theme</button><button class="btn" id="wlib">Widgets</button><button class="btn" id="export">Export JSON</button><button class="btn primary" id="present">Present</button></header>
   <aside class="rail"><ol id="thumbs" class="thumbs"></ol><button class="btn add" id="add">+ Add slide</button></aside>
   <main class="canvas"><div class="ctop"><span id="slabel" class="muted"></span>

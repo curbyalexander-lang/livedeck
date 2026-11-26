@@ -3,8 +3,8 @@
 //   #edit-<deckId>    authoring tool
 //   #present-<deckId> presenter screen (starts a live session)
 //   #join  /  #join-<CODE>   audience phones
-import { getStore } from './store.js';
-import { esc } from './types.js';
+import { getStore } from './store.js?v=2.0';
+import { esc } from './types.js?v=2.0';
 
 const root = document.getElementById('app');
 let store, cleanup = null, token = 0;
@@ -23,7 +23,7 @@ async function route() {
   if (view !== 'join' && !store.isPresenter()) return signIn();
   root.innerHTML = '<p class="loading">Loading…</p>';
   try {
-    const mod = await import(`./${({ decks: 'dashboard', edit: 'editor' })[view] || view}.js`);
+    const mod = await import(`./${({ decks: 'dashboard', edit: 'editor' })[view] || view}.js?v=2.0`);
     if (my !== token) return;
     cleanup = (await mod.mount(root, store, arg)) || null;
   } catch (e) {

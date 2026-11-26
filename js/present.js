@@ -1,7 +1,7 @@
 // Presenter screen: starts (or resumes) a live session, drives everyone's phones, draws live results.
-import { TYPES, renderSlide, esc, describe } from './types.js';
-import { normalize, loadFonts } from './themes.js';
-import { createInk } from './ink.js';
+import { TYPES, renderSlide, esc, describe } from './types.js?v=2.0';
+import { normalize, loadFonts } from './themes.js?v=2.0';
+import { createInk } from './ink.js?v=2.0';
 
 export async function mount(root, store, deckId) {
   const deck = await store.getDeck(deckId);

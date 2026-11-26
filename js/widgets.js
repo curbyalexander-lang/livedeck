@@ -13,8 +13,8 @@
 //   LiveDeck.setLive(v) (stage, while presenting) broadcast state to every phone, e.g. a timer or a revealed answer
 //
 // The frame cannot reach your Firebase sign-in, cookies, or the rest of the page.
-import { esc } from './util.js';
-import { normalize, FONTS } from './themes.js';
+import { esc } from './util.js?v=2.0';
+import { normalize, FONTS } from './themes.js?v=2.0';
 
 const MAX = 2000;
 export const parseConfig = c => { const t = String(c ?? '').trim(); if (!t) return null; try { return JSON.parse(t); } catch (e) { return t; } };

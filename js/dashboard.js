@@ -1,5 +1,6 @@
-import { esc, newSlide } from './types.js';
-import { EXAMPLES } from './widgets.js';
+import { esc, newSlide } from './types.js?v=2.0';
+import { EXAMPLES } from './widgets.js?v=2.0';
+import { VERSION } from './version.js?v=2.0';
 
 export function sampleDeck(w = {}) {
   const s = (type, o) => Object.assign(newSlide(type), o);
@@ -32,7 +33,8 @@ export async function mount(root, store) {
     <label class="btn">Import JSON<input type="file" accept="application/json,.json" id="imp" hidden></label>
   </div></div>
   <p class="err" id="err"></p>
-  <div id="list" class="decklist"><p class="muted">Loading…</p></div></div>`;
+  <div id="list" class="decklist"><p class="muted">Loading…</p></div>
+  <p class="muted small ver">LiveDeck version ${VERSION} · ${local ? 'local mode' : 'Firebase'}</p></div>`;
   const $ = s => root.querySelector(s), err = m => $('#err').textContent = m || '';
   if (!local) $('#so').onclick = () => store.signOut();
 
