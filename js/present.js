@@ -50,7 +50,7 @@ export async function display(root, store, { deckId, code }) {
     <button class="btn" id="reveal">Reveal results</button><button class="btn" id="act"></button><span class="grow"></span>
     <span class="joined" id="joined"></span><span class="rchip" id="rchip" hidden>Remote connected</span>
     <button class="btn primary" id="rbtn">Presenter remote</button><button class="btn" id="jbtn">Join info</button><button class="btn" id="nbtn">Notes</button>
-    <button class="btn" id="csv">Results CSV</button><button class="btn" id="fs">Full screen</button><button class="btn ghost" id="end">End session</button></div>
+    <button class="btn" id="csv">Results CSV</button><button class="btn" id="fs">Full screen</button><button class="btn ghost" id="end">End session</button><a class="btn ghost" id="exit" href="#decks" title="Leave this screen. The session stays open until you end it.">Exit</a></div>
   <div class="notes" id="notes" hidden></div>
   <p class="help">Keys: ← → move · R reveal · S spin · D draw (P pen, H highlighter, L laser, E eraser, Esc stop) · J join info · N notes · F full screen. Reloading keeps the same session and code.</p>
   <div class="modal" id="rmodal" hidden><div class="mbox rbox" role="dialog" aria-label="Presenter remote">
@@ -102,8 +102,11 @@ export async function display(root, store, { deckId, code }) {
   function fullscreen() { const st = $('#stage'); if (document.fullscreenElement) document.exitFullscreen().catch(() => { }); else st.requestFullscreen?.().catch(() => { }); }
   function showEnded() {
     ended = true; try { sessionStorage.removeItem(KEY); } catch (e) { }
-    $('#slot').innerHTML = `<div class="slide"><div class="tcenter"><h1 class="big">Session ended</h1><p class="sub">${responses.length} participants · results saved</p></div></div>`;
-    $('#end').hidden = true; showJoin = false; overlays(); buttons();
+    $('#slot').innerHTML = `<div class="slide"><div class="tcenter"><h1 class="big">Session ended</h1><p class="sub">${responses.length} ${responses.length === 1 ? 'participant' : 'participants'} · results saved</p>
+      <div class="endbtns"><a class="btn primary" href="#edit-${esc(deckId)}">Edit this presentation</a><a class="btn" href="#decks">Back to presentations</a><button class="btn" id="endcsv">Download results (CSV)</button></div></div></div>`;
+    $('#endcsv').onclick = () => downloadCsv(deck.title, code, slides, responses);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
+    $('#end').hidden = true; $('#exit').textContent = 'Back to presentations'; showJoin = false; showBadge = false; overlays(); buttons();
   }
 
   // Follow the session: changes made by the remote (or another display) show up here.

@@ -111,7 +111,7 @@ export async function mount(root, store, arg) {
     if (!b.classList.contains('confirm')) { b.classList.add('confirm'); b.textContent = 'Tap again to end'; setTimeout(() => { b.classList.remove('confirm'); b.textContent = 'End'; }, 3000); return; }
     await push({ open: false }); showEnded();
   };
-  function showEnded() { ended = true; setTimer({ running: false, acc: elapsed() }); root.querySelector('.rcur').insertAdjacentHTML('afterbegin', '<p class="rended">This session has ended. Results are saved; download them from the main screen.</p>'); buttons(); }
+  function showEnded() { ended = true; setTimer({ running: false, acc: elapsed() }); root.querySelector('.rcur').insertAdjacentHTML('afterbegin', `<div class="rended"><p>This session has ended. Results are saved; download them from the main screen or with Export.</p><p class="endbtns"><a class="btn primary" href="#edit-${esc(sess0.deckId)}">Edit this presentation</a><a class="btn" href="#decks">Back to presentations</a></p></div>`); buttons(); }
 
   // Swipe the current slide to move (when not drawing)
   let sx = null, sy = 0;
