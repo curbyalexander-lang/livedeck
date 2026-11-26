@@ -1,6 +1,6 @@
 // Data layer. The rest of the app only talks to the object returned by getStore(),
 // so it works the same whether it's backed by Firebase or by this browser (local mode).
-import { FIREBASE_CONFIG as CFG } from './config.js?v=2.2';
+import { FIREBASE_CONFIG as CFG } from './config.js?v=2.3';
 
 const FIREBASE_VERSION = '10.12.2';
 const configured = !!(CFG && CFG.apiKey && !/^PASTE/.test(CFG.apiKey) && CFG.projectId);

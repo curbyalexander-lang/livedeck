@@ -1,9 +1,9 @@
 // Presenter remote (#remote-CODE): run a live session from your phone or iPad.
 // Timer, current slide (with live results and drawing), next slide, notes, and big controls.
 // Everything goes through the session, so the display (and the audience's phones) follow along.
-import { TYPES, renderSlide, esc } from './types.js?v=2.2';
-import { createInk } from './ink.js?v=2.2';
-import { prepare, valuesFor, inkSync, fmtTime } from './live.js?v=2.2';
+import { TYPES, renderSlide, esc } from './types.js?v=2.3';
+import { createInk } from './ink.js?v=2.3';
+import { prepare, valuesFor, inkSync, fmtTime } from './live.js?v=2.3';
 
 const GOALS = [0, 5, 10, 15, 20, 30, 45, 50, 60, 75, 90, 120];
 

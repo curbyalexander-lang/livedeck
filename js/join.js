@@ -1,6 +1,6 @@
 // Audience phone view. No account needed: Firebase anonymous sign-in gives each phone an id.
-import { TYPES, esc } from './types.js?v=2.2';
-import { normalize, loadFonts, FONTS } from './themes.js?v=2.2';
+import { TYPES, esc, phonePics } from './types.js?v=2.3';
+import { normalize, loadFonts, FONTS } from './themes.js?v=2.3';
 
 export async function mount(root, store, arg) {
   const code = String(arg || '').toUpperCase();
@@ -45,7 +45,7 @@ export async function mount(root, store, arg) {
       T.mount(s, ctl, mine[s.id], v => { mine[s.id] = v; send(s.type === 'words' ? `Sent “${v}”. You can change it anytime.` : null); }, pctx);
       if (T.after && s.type !== 'custom') T.after(s, ctl, pctx, false);
       if (T.interactive && session.reveal && session.reveal[s.id]) saved('Results are up on the screen.');
-    } else pc.innerHTML = T.phone(s);
+    } else pc.innerHTML = T.phone(s) + phonePics(s);
   }
 
   const unsub = store.watchSession(code, s => {

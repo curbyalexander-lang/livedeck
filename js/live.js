@@ -1,6 +1,6 @@
 // Helpers shared by the display (big screen) and the presenter remote.
-import { TYPES, describe } from './types.js?v=2.2';
-import { normalize, loadFonts } from './themes.js?v=2.2';
+import { TYPES, describe } from './types.js?v=2.3';
+import { normalize, loadFonts } from './themes.js?v=2.3';
 
 // Slides as they run live: custom widget slides carry their code; phones get a copy without notes.
 export async function prepare(store, deck) {

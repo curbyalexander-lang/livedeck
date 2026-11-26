@@ -58,6 +58,8 @@ To enable the **Upload** button: in Firebase, turn on **Storage**, paste `storag
 
 **Authoring:** Open a presentation. Left: slides (drag to reorder). Center: live preview, with sample results so you can see what interactive slides will look like. Right: the selected slide's content, plus speaker notes. **+ Add slide** offers every type. Everything autosaves. **Export JSON** gives you a backup file you can re-import from the dashboard.
 
+**Pictures anywhere:** Every slide has a **Pictures on this slide** section in the right-hand panel. Add as many pictures as you like (paste links, or upload several at once), then drag them on the slide to move them. Drag a corner to resize (the picture keeps its shape; hold Shift to stretch it), or drag an edge to stretch one side. Edges and centres snap to the slide's edges and centre line (hold Alt/Option while dragging to turn snapping off). Arrow keys nudge the selected picture (Shift for bigger steps) and Delete removes it. Each picture can show whole or be cropped to fill its box, sit in front of or behind the slide's text, and be brought forward or sent backward. For a collage, use the **Free layout** slide type, which starts empty. On audience phones, a slide's pictures appear stacked below its text.
+
 **Presenting:** Click **Present**. A join screen shows a QR code and a 5-character code; press → (or Start) to begin. Keys: ← → move · **R** reveal/hide results · **S** spin · **J** join screen · **N** speaker notes · **F** full screen. Results stay hidden until you reveal them, so early answers don't sway the room. Reloading the presenter tab keeps the same session and code.
 
 **Presenter remote (phone or iPad):** On the main screen, click **Presenter remote** and scan the code with your phone or iPad (sign in there with the same Google account). The remote shows a timer (it starts on your first Next; set a talk length to see time left, which turns amber in the last five minutes and red when you're over), the current slide with live results, a preview of the next slide, your notes, and big **Back** / **Next** buttons. You can also swipe the slide to move, reveal results, spin, show the join screen, jump to any slide, or end the session. Tap **Draw** to annotate with your finger or Apple Pencil: the ink appears on the projected screen. The remote keeps the screen awake while it's open. With two screens on one computer, use **Open presenter view in a new window** instead and drag the main window to the projector. If you started the session somewhere else, open `…/#screen-CODE` on the projector computer to show the display for it.
@@ -100,7 +102,7 @@ Custom widgets (above) are the quick way. To make a new slide type part of the a
 
 Browsers keep copies of the site's files for a few minutes, so after you upload new files you might still see the old version. The version number shows at the bottom of the presentations page and in the editor's top bar.
 
-When you change the code yourself, change the version so browsers fetch the new files: replace every `?v=2.2` with a new number such as `?v=2.3` (search and replace across `index.html` and the `js` folder), and update `js/version.js` to match.
+When you change the code yourself, change the version so browsers fetch the new files: replace every `?v=2.3` with a new number such as `?v=2.4` (search and replace across `index.html` and the `js` folder), and update `js/version.js` to match.
 
 ## Updating Firebase
 

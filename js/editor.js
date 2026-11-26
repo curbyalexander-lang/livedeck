@@ -1,9 +1,11 @@
 // Authoring tool: slide rail (left), live preview (center), properties (right). Autosaves.
-import { TYPES, renderSlide, newSlide, esc, sampleValues } from './types.js?v=2.2';
-import { normalize, loadFonts, DEFAULT_THEME } from './themes.js?v=2.2';
-import { openThemePanel } from './themepanel.js?v=2.2';
-import { openWidgetLib } from './widgetlib.js?v=2.2';
-import { VERSION } from './version.js?v=2.2';
+import { TYPES, renderSlide, newSlide, esc, sampleValues } from './types.js?v=2.3';
+import { normalize, loadFonts, DEFAULT_THEME } from './themes.js?v=2.3';
+import { openThemePanel } from './themepanel.js?v=2.3';
+import { openWidgetLib } from './widgetlib.js?v=2.3';
+import { VERSION } from './version.js?v=2.3';
+import { createArrange } from './arrange.js?v=2.3';
+import { safeUrl } from './util.js?v=2.3';
 
 export async function mount(root, store, id) {
   const deck = await store.getDeck(id);
@@ -11,7 +13,7 @@ export async function mount(root, store, id) {
   deck.id = id; deck.slides = Array.isArray(deck.slides) ? deck.slides : [];
   if (!deck.slides.length) deck.slides.push(newSlide('title'));
   deck.theme = normalize(deck.theme || DEFAULT_THEME); loadFonts(deck.theme);
-  let sel = 0, sample = true, timer = 0, saving = Promise.resolve(), dragFrom = -1, widgets = {};
+  let sel = 0, sample = true, timer = 0, saving = Promise.resolve(), dragFrom = -1, widgets = {}, arr = null;
   const setWidgets = arr => { widgets = {}; (arr || []).forEach(w => widgets[w.id] = w); };
   try { setWidgets(await store.listItems('widgets')); } catch (e) { }
 
@@ -72,6 +74,7 @@ export async function mount(root, store, id) {
     const s = deck.slides[sel], T = TYPES[s.type], el = $('#preview');
     el.innerHTML = renderSlide(s, ctxFor(s, 'edit'));
     if (T && T.after) T.after(s, el, ctxFor(s, 'edit'), false);
+    if (arr) arr.render();
     $('#slabel').textContent = `Slide ${sel + 1} of ${deck.slides.length} · ${T ? T.label : s.type}`;
   }
   $('#sample').onchange = e => { sample = e.target.checked; drawPreview(); drawThumbs(); };
@@ -100,8 +103,50 @@ export async function mount(root, store, id) {
     $('#props').innerHTML = `<div class="phead"><h2>${esc(T ? T.label : s.type)}</h2>
       <div class="ptools"><button class="btn small" data-act="up" aria-label="Move slide up"${sel === 0 ? ' disabled' : ''}>↑</button><button class="btn small" data-act="down" aria-label="Move slide down"${sel === deck.slides.length - 1 ? ' disabled' : ''}>↓</button><button class="btn small" data-act="dup">Duplicate</button><button class="btn small ghost" data-act="del"${deck.slides.length < 2 ? ' disabled' : ''}>Delete</button></div></div>
       ${T ? `<p class="muted small">${esc(T.blurb)}</p>` + T.fields.map(f => fieldHtml(f, s[f.k])).join('') : ''}
+      ${picsPanel(s)}
       <div class="field"><label for="f-notes">Speaker notes</label><textarea id="f-notes" data-k="notes" rows="4">${esc(s.notes || '')}</textarea><small>Only you see these, below the slide while presenting.</small></div>`;
   }
+  // ---- pictures (any slide can hold several, placed freely) ----
+  function picsPanel(s) {
+    const list = Array.isArray(s.pics) ? s.pics : [], on = arr && arr.selected;
+    return `<div class="field picsf"><label>Pictures on this slide${list.length ? ` (${list.length})` : ''}</label>
+      <div class="piclist">${list.map((p, i) => `<div class="picrow${p.id === on ? ' on' : ''}" data-pid="${esc(p.id)}">
+        <button class="pthumb" data-pa="sel" aria-label="Select picture ${i + 1}">${safeUrl(p.src) ? `<img src="${esc(safeUrl(p.src))}" alt="">` : ''}</button>
+        <div class="pfields"><input data-pk="alt" value="${esc(p.alt || '')}" placeholder="Alt text (describe it)" aria-label="Alt text for picture ${i + 1}">
+        <div class="prow2"><select data-pk="fit" aria-label="Fit"><option value="contain"${p.fit !== 'cover' ? ' selected' : ''}>Whole picture</option><option value="cover"${p.fit === 'cover' ? ' selected' : ''}>Crop to fill box</option></select>
+        <label class="chk small"><input type="checkbox" data-pk="back"${p.back ? ' checked' : ''}> Behind text</label></div></div>
+        <div class="pbtns"><button class="btn small" data-pa="up" aria-label="Bring forward"${i === list.length - 1 ? ' disabled' : ''}>↑</button><button class="btn small" data-pa="down" aria-label="Send backward"${i === 0 ? ' disabled' : ''}>↓</button><button class="btn small ghost" data-pa="del" aria-label="Remove picture">✕</button></div>
+      </div>`).join('')}</div>
+      <div class="mediaf"><input id="newpic" type="text" inputmode="url" placeholder="Paste an image link…" aria-label="Image link"><button class="btn small" data-act="addpic">Add</button>
+      ${store.canUpload ? '<label class="btn small">Upload<input type="file" accept="image/*" multiple data-picup="1" hidden></label>' : ''}</div>
+      <small class="uperr" id="picerr"></small>
+      <small>${list.length ? 'Drag pictures on the slide to move them. Drag a corner to resize (hold Shift to stretch), or an edge to stretch one side. Arrow keys nudge the selected picture; Delete removes it.' : 'Add as many pictures as you like (you can upload several at once), then drag them into place on the slide.'}</small></div>`;
+  }
+  function addPics(srcs) {
+    const s = deck.slides[sel]; s.pics = Array.isArray(s.pics) ? s.pics : [];
+    let last = null, pending = srcs.length;
+    srcs.forEach((src, k) => {
+      const img = new Image();
+      const place = ar => {
+        const n = s.pics.length, w = srcs.length > 1 ? Math.min(30, 90 / srcs.length) : 36, h = Math.min(80, w * 16 / 9 / (ar || 4 / 3));
+        const p = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), src, alt: '', fit: 'contain', back: false, w: +w.toFixed(2), h: +h.toFixed(2),
+          x: +(srcs.length > 1 ? 5 + k * (90 / srcs.length) : 8 + (n * 6) % 48).toFixed(2), y: +(srcs.length > 1 ? (100 - h) / 2 : 12 + (n * 6) % 40).toFixed(2) };
+        s.pics.push(p); last = p.id;
+        if (--pending === 0) { if (deck.slides[sel] === s) { drawPreview(); arr.select(last); drawProps(); } updateThumb(); queue(); }
+      };
+      img.onload = () => place(img.naturalWidth / img.naturalHeight); img.onerror = () => place(4 / 3); img.src = src;
+    });
+  }
+  function picAction(a, pid) {
+    const s = deck.slides[sel], L = s.pics || [], i = L.findIndex(p => p.id === pid); if (i < 0) return;
+    if (a === 'sel') { arr.select(pid); return; }
+    if (a === 'up' && i < L.length - 1) [L[i], L[i + 1]] = [L[i + 1], L[i]];
+    else if (a === 'down' && i > 0) [L[i], L[i - 1]] = [L[i - 1], L[i]];
+    else if (a === 'del') L.splice(i, 1);
+    else return;
+    drawPreview(); drawProps(); updateThumb(); queue();
+  }
+
   function setField(k, el) {
     const s = deck.slides[sel], T = TYPES[s.type], f = T.fields.find(x => x.k === k) || { type: 'text' };
     if (f.type === 'list') s[k] = el.value.split('\n').map(x => x.trim()).filter(Boolean);
@@ -114,9 +159,20 @@ export async function mount(root, store, id) {
     if (f.type === 'widget') drawProps();
   }
   const props = $('#props');
-  props.oninput = e => { const k = e.target.dataset.k; if (k && e.target.type !== 'file') setField(k, e.target); };
+  props.oninput = e => {
+    const pk = e.target.dataset.pk;
+    if (pk) { const row = e.target.closest('.picrow'), p = (deck.slides[sel].pics || []).find(x => x.id === row.dataset.pid); if (!p) return; p[pk] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; drawPreview(); updateThumb(); queue(); return; }
+    const k = e.target.dataset.k; if (k && e.target.type !== 'file') setField(k, e.target);
+  };
+  props.onkeydown = e => { if (e.target.id === 'newpic' && e.key === 'Enter') { e.preventDefault(); props.querySelector('[data-act="addpic"]').click(); } };
   props.onchange = async e => {
     if (e.target.tagName === 'SELECT') return; // handled by input
+    if (e.target.dataset.picup && e.target.files.length) {
+      const err = props.querySelector('#picerr'); err.textContent = 'Uploading…'; const urls = [];
+      for (const f of [...e.target.files].slice(0, 12)) { try { urls.push(await store.upload(f)); } catch (x) { err.textContent = x.message || 'Upload failed.'; } }
+      if (urls.length) { if (err.textContent === 'Uploading…') err.textContent = ''; addPics(urls); }
+      return;
+    }
     const k = e.target.dataset.up; if (!k || !e.target.files[0]) return;
     const msg = props.querySelector(`[data-uperr="${k}"]`); msg.textContent = 'Uploading…';
     try { deck.slides[sel][k] = await store.upload(e.target.files[0]); drawProps(); drawPreview(); updateThumb(); queue(); }
@@ -124,8 +180,10 @@ export async function mount(root, store, id) {
   };
   props.onclick = e => {
     const c = e.target.closest('[data-clear]'); if (c) { deck.slides[sel][c.dataset.clear] = ''; drawProps(); drawPreview(); updateThumb(); queue(); return; }
+    const pa = e.target.closest('[data-pa]'); if (pa) return picAction(pa.dataset.pa, pa.closest('.picrow').dataset.pid);
     const b = e.target.closest('[data-act]'); if (!b) return;
     const a = b.dataset.act, S = deck.slides;
+    if (a === 'addpic') { const u = props.querySelector('#newpic').value.trim(); if (!safeUrl(u)) { props.querySelector('#picerr').textContent = 'That doesn\u2019t look like an image link (it should start with https://).'; return; } addPics([u]); return; }
     if (a === 'wedit') return openLib(S[sel].widgetId);
     if (a === 'up' && sel > 0) { [S[sel - 1], S[sel]] = [S[sel], S[sel - 1]]; sel--; }
     else if (a === 'down' && sel < S.length - 1) { [S[sel + 1], S[sel]] = [S[sel], S[sel + 1]]; sel++; }
@@ -150,7 +208,11 @@ export async function mount(root, store, id) {
     const b = e.target.closest('.ptype'); if (!b) return;
     deck.slides.splice(sel + 1, 0, newSlide(b.dataset.type)); sel++; closePicker(); queue(); drawAll();
   };
-  const onKey = e => { if (e.key === 'Escape' && !$('#picker').hidden) closePicker(); };
+  const onKey = e => {
+    if (e.key === 'Escape' && !$('#picker').hidden) return closePicker();
+    if (document.querySelector('.modal:not([hidden])') || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable) return;
+    if (arr.key(e)) e.preventDefault();
+  };
   document.addEventListener('keydown', onKey);
 
   // ---- theme + widget library ----
@@ -172,6 +234,11 @@ export async function mount(root, store, id) {
   };
   $('#present').onclick = async () => { await save(); location.hash = '#present-' + id; };
 
+  arr = createArrange($('#preview'), {
+    getSlide: () => deck.slides[sel],
+    onSelect: id => root.querySelectorAll('.picrow').forEach(r => r.classList.toggle('on', r.dataset.pid === id)),
+    onCommit: structural => { if (structural) { drawPreview(); drawProps(); } updateThumb(); queue(); }
+  });
   function select(i) { sel = i; root.querySelectorAll('.thumbs li').forEach(l => l.classList.toggle('on', +l.dataset.i === sel)); drawPreview(); drawProps(); }
   function drawAll() { drawThumbs(); drawPreview(); drawProps(); }
   drawAll();

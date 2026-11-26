@@ -2,9 +2,9 @@
 // follows the session state, so it can be driven by its own keys/buttons OR by the presenter
 // remote on your phone or iPad (#remote-CODE). Opening #screen-CODE shows the display for a
 // session that's already running (e.g. started from your iPad).
-import { TYPES, renderSlide, esc } from './types.js?v=2.2';
-import { createInk } from './ink.js?v=2.2';
-import { prepare, valuesFor, downloadCsv, qrSvg, inkSync } from './live.js?v=2.2';
+import { TYPES, renderSlide, esc } from './types.js?v=2.3';
+import { createInk } from './ink.js?v=2.3';
+import { prepare, valuesFor, downloadCsv, qrSvg, inkSync } from './live.js?v=2.3';
 
 export const mount = (root, store, deckId) => display(root, store, { deckId });
 

@@ -1,9 +1,9 @@
 // Widget library: write, test, and save your own interactive widgets.
 // The test area runs the widget exactly as it will run live: a big-screen frame plus test phones,
 // with answers from the test phones flowing to the big screen.
-import { EXAMPLES, widgetDoc, attach, send, parseConfig } from './widgets.js?v=2.2';
-import { themeStyle } from './themes.js?v=2.2';
-import { esc } from './util.js?v=2.2';
+import { EXAMPLES, widgetDoc, attach, send, parseConfig } from './widgets.js?v=2.3';
+import { themeStyle } from './themes.js?v=2.3';
+import { esc } from './util.js?v=2.3';
 
 export async function openWidgetLib({ store, theme, startId, onSaved }) {
   let list = []; try { list = await store.listItems('widgets'); } catch (e) { }

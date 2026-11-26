@@ -15,9 +15,9 @@
 // To invent a new interaction, add one more entry here. Nothing else changes.
 // =====================================================================
 
-import { esc, safeUrl } from './util.js?v=2.2';
-import { themeStyle } from './themes.js?v=2.2';
-import { customType } from './widgets.js?v=2.2';
+import { esc, safeUrl } from './util.js?v=2.3';
+import { themeStyle } from './themes.js?v=2.3';
+import { customType } from './widgets.js?v=2.3';
 export { esc, safeUrl };
 const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const F = (k, label, type = 'text', hint = '', opts = null) => ({ k, label, type, hint, opts });
@@ -111,6 +111,13 @@ export const TYPES = {
     fields: [F('heading', 'Heading'), F('body', 'Body', 'textarea', 'Blank line = new paragraph. "- " = bullet.'), F('src', 'Image', 'media'), F('alt', 'Alt text'), F('side', 'Image side', 'select', '', [['right', 'Right'], ['left', 'Left']])],
     stage: s => `<div class="split${s.side === 'left' ? ' rev' : ''}"><div>${h1(s.heading)}<div class="body">${richText(s.body)}</div></div><div class="media">${img(s.src, s.alt)}</div></div>`,
     phone: s => `<h2>${esc(s.heading)}</h2><div class="pbody">${richText(s.body)}</div><div class="pimg">${img(s.src, s.alt)}</div>`
+  },
+  blank: {
+    label: 'Free layout', group: 'Content', blurb: 'Place several pictures anywhere; drag to move and resize',
+    defaults: { heading: '', pics: [] },
+    fields: [F('heading', 'Heading (optional)')],
+    stage: s => h1(s.heading) || (s.pics && s.pics.length ? '' : '<div class="ph">Add pictures in the panel, then drag them into place</div>'),
+    phone: s => s.heading ? `<h2>${esc(s.heading)}</h2>` : ''
   },
   video: {
     label: 'Video', group: 'Content', blurb: 'YouTube, Vimeo, or an .mp4 file',
@@ -220,8 +227,18 @@ export function newSlide(type) {
 export function renderSlide(s, ctx = {}) {
   const T = TYPES[s && s.type];
   if (!T) return `<div class="slide"><p class="body">Unknown slide type</p></div>`;
-  return `<div class="slide t-${s.type}" style="${themeStyle(ctx.theme)}">${T.stage(s, ctx)}</div>`;
+  return `<div class="slide t-${s.type}" style="${themeStyle(ctx.theme)}">${picsHtml(s, true)}${T.stage(s, ctx)}${picsHtml(s, false)}</div>`;
 }
+// Pictures layer: any slide can carry freely placed pictures (s.pics), each positioned in
+// percent of the slide: { id, src, alt, x, y, w, h, fit: 'contain'|'cover', back: behind the text? }
+const pct = (v, lo, hi) => Math.max(lo, Math.min(hi, Number(v) || 0)).toFixed(2);
+export const picStyle = p => `left:${pct(p.x, -100, 200)}%;top:${pct(p.y, -100, 200)}%;width:${pct(p.w, 1, 300)}%;height:${pct(p.h, 1, 300)}%;object-fit:${p.fit === 'cover' ? 'cover' : 'contain'}`;
+function picsHtml(s, back) {
+  const list = (Array.isArray(s.pics) ? s.pics : []).filter(p => !!p.back === back && safeUrl(p.src));
+  if (!list.length) return '';
+  return `<div class="pics${back ? ' back' : ''}">${list.map(p => `<img class="pic" data-pid="${esc(p.id)}" src="${esc(safeUrl(p.src))}" alt="${esc(p.alt || '')}" style="${picStyle(p)}" draggable="false">`).join('')}</div>`;
+}
+export const phonePics = s => (Array.isArray(s.pics) ? s.pics : []).filter(p => safeUrl(p.src)).map(p => `<div class="pimg"><img src="${esc(safeUrl(p.src))}" alt="${esc(p.alt || '')}"></div>`).join('');
 // Stable fake responses for previews (seeded by the slide id, so they don't jump while you type)
 export function sampleValues(s, n = 20) {
   const T = TYPES[s.type]; if (!T || !T.sim) return [];

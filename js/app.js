@@ -5,8 +5,8 @@
 //   #join  /  #join-<CODE>   audience phones
 //   #remote-<CODE>    presenter remote (phone/iPad): timer, next slide, notes, controls
 //   #screen-<CODE>    the display for a session that's already running
-import { getStore } from './store.js?v=2.2';
-import { esc } from './types.js?v=2.2';
+import { getStore } from './store.js?v=2.3';
+import { esc } from './types.js?v=2.3';
 
 const root = document.getElementById('app');
 let store, cleanup = null, token = 0;
@@ -25,7 +25,7 @@ async function route() {
   if (view !== 'join' && !store.isPresenter()) return signIn();
   root.innerHTML = '<p class="loading">Loading…</p>';
   try {
-    const mod = await import(`./${({ decks: 'dashboard', edit: 'editor' })[view] || view}.js?v=2.2`);
+    const mod = await import(`./${({ decks: 'dashboard', edit: 'editor' })[view] || view}.js?v=2.3`);
     if (my !== token) return;
     cleanup = (await mod.mount(root, store, arg)) || null;
   } catch (e) {
