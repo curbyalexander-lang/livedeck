@@ -10,3 +10,4 @@ export const FIREBASE_CONFIG = {
   messagingSenderId: '255579874024',
   appId: '1:255579874024:web:219d601e5059b310381f5d'
 };
+export const SHORT_JOIN_URL = 'https://livedeck.s.gy/join';
