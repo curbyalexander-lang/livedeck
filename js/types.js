@@ -16,6 +16,7 @@
 // =====================================================================
 
 import { esc, safeUrl } from './util.js?v=2.3';
+import { mdToHtml } from './format.js?v=2.3';
 import { themeStyle } from './themes.js?v=2.3';
 import { customType } from './widgets.js?v=2.3';
 export { esc, safeUrl };
@@ -23,21 +24,14 @@ const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-
 const F = (k, label, type = 'text', hint = '', opts = null) => ({ k, label, type, hint, opts });
 const list = (a, max) => (Array.isArray(a) ? a : []).map(x => String(x).trim()).filter(Boolean).slice(0, max);
 
-function richText(t) {
-  return String(t || '').split(/\n\s*\n/).map(block => {
-    const lines = block.split('\n').filter(l => l.trim());
-    if (lines.length && lines.every(l => /^\s*[-•]\s+/.test(l)))
-      return `<ul>${lines.map(l => `<li>${esc(l.replace(/^\s*[-•]\s+/, ''))}</li>`).join('')}</ul>`;
-    return lines.length ? `<p>${lines.map(esc).join('<br>')}</p>` : '';
-  }).join('');
-}
+const richText = mdToHtml;
 const img = (src, alt) => safeUrl(src) ? `<img src="${esc(safeUrl(src))}" alt="${esc(alt || '')}">` : `<div class="ph">Add an image in the panel</div>`;
 // While the editor renders its preview, text gets data-f (field) / data-i (list index) markers so it
 // can be edited in place. EDIT is only true during that one synchronous render.
 let EDIT = false;
 const A = (f, i, ph) => EDIT ? ` data-f="${f}"${i != null ? ` data-i="${i}"` : ''}${ph ? ` data-ph="${esc(ph)}"` : ''}` : '';
 const h1 = (t, f, req) => t || (EDIT && req) ? `<h1${f ? A(f, null, req ? 'Type a heading' : '') : ''}>${esc(t)}</h1>` : '';
-const body = t => `<div class="body"${EDIT ? ` data-f="body" data-ph="Type here" data-raw="${esc(t || '')}"` : ''}>${richText(t)}</div>`;
+const body = (t, s = {}) => `<div class="body${({ s: ' sz-s', l: ' sz-l', xl: ' sz-xl' })[s.size] || ''}${s.align === 'center' ? ' al-c' : ''}"${EDIT ? ` data-f="body" data-ph="Type here"` : ''}>${richText(t)}</div>`;
 
 function videoEmbed(url, thumb) {
   const u = String(url || '').trim();
@@ -107,10 +101,10 @@ export const TYPES = {
     phone: s => `<h2>${esc(s.title)}</h2><p class="look">${esc(s.sub)}</p>`
   },
   text: {
-    label: 'Text', group: 'Content', blurb: 'Heading with paragraphs or bullets',
+    label: 'Text', group: 'Content', blurb: 'Heading with formatted text, bullets, or numbered lists',
     defaults: { heading: 'Heading', body: 'Write a paragraph here.\n\n- Start lines with a dash\n- to make bullet points' },
-    fields: [F('heading', 'Heading'), F('body', 'Body', 'textarea', 'Leave a blank line between paragraphs. Start lines with "- " for bullets.')],
-    stage: s => `${h1(s.heading, 'heading', true)}${body(s.body)}`,
+    fields: [F('heading', 'Heading'), F('body', 'Body', 'textarea', 'Blank line = new paragraph. Start lines with "- " for bullets or "1. " for numbers. **bold**, *italic*, __underline__, ==highlight==, [link](https://…). Or click the text on the slide and use the formatting bar.'), F('size', 'Text size', 'select', '', [['m', 'Normal'], ['s', 'Small'], ['l', 'Large'], ['xl', 'Extra large']]), F('align', 'Text alignment', 'select', '', [['left', 'Left'], ['center', 'Centered']])],
+    stage: s => `${h1(s.heading, 'heading', true)}${body(s.body, s)}`,
     phone: s => `<h2>${esc(s.heading)}</h2><div class="pbody">${richText(s.body)}</div>`
   },
   image: {
@@ -123,8 +117,8 @@ export const TYPES = {
   split: {
     label: 'Image + text', group: 'Content', blurb: 'Text on one side, picture on the other',
     defaults: { heading: 'Heading', body: 'Explain the picture here.', src: '', alt: '', side: 'right' },
-    fields: [F('heading', 'Heading'), F('body', 'Body', 'textarea', 'Blank line = new paragraph. "- " = bullet.'), F('src', 'Image', 'media'), F('alt', 'Alt text'), F('side', 'Image side', 'select', '', [['right', 'Right'], ['left', 'Left']])],
-    stage: s => `<div class="split${s.side === 'left' ? ' rev' : ''}"><div>${h1(s.heading, 'heading', true)}${body(s.body)}</div><div class="media">${img(s.src, s.alt)}</div></div>`,
+    fields: [F('heading', 'Heading'), F('body', 'Body', 'textarea', 'Blank line = new paragraph. Start lines with "- " for bullets or "1. " for numbers. **bold**, *italic*, __underline__, ==highlight==, [link](https://…). Or click the text on the slide and use the formatting bar.'), F('size', 'Text size', 'select', '', [['m', 'Normal'], ['s', 'Small'], ['l', 'Large'], ['xl', 'Extra large']]), F('align', 'Text alignment', 'select', '', [['left', 'Left'], ['center', 'Centered']]), F('src', 'Image', 'media'), F('alt', 'Alt text'), F('side', 'Image side', 'select', '', [['right', 'Right'], ['left', 'Left']])],
+    stage: s => `<div class="split${s.side === 'left' ? ' rev' : ''}"><div>${h1(s.heading, 'heading', true)}${body(s.body, s)}</div><div class="media">${img(s.src, s.alt)}</div></div>`,
     phone: s => `<h2>${esc(s.heading)}</h2><div class="pbody">${richText(s.body)}</div><div class="pimg">${img(s.src, s.alt)}</div>`
   },
   blank: {

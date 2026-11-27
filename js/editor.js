@@ -26,6 +26,15 @@ export async function mount(root, store, id) {
   <aside class="rail"><ol id="thumbs" class="thumbs"></ol><button class="btn add" id="add">+ Add slide</button></aside>
   <main class="canvas"><div class="ctop"><span id="slabel" class="muted"></span>
     <label class="chk"><input type="checkbox" id="sample" checked> Preview with sample results</label></div>
+    <div class="fmtbar" id="fmtbar" role="toolbar" aria-label="Text formatting" hidden>
+      <button data-cmd="bold" title="Bold (Cmd/Ctrl+B)" aria-label="Bold"><b>B</b></button><button data-cmd="italic" title="Italic (Cmd/Ctrl+I)" aria-label="Italic"><i>I</i></button><button data-cmd="underline" title="Underline (Cmd/Ctrl+U)" aria-label="Underline"><u>U</u></button><button data-cmd="highlight" title="Highlight" aria-label="Highlight"><mark>ab</mark></button>
+      <span class="fsep"></span><button data-cmd="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">• List</button><button data-cmd="insertOrderedList" title="Numbered list" aria-label="Numbered list">1. List</button>
+      <span class="fsep"></span><button data-cmd="link" title="Link" aria-label="Add link">Link</button><button data-cmd="removeFormat" title="Clear formatting" aria-label="Clear formatting">Clear</button>
+      <span class="flink" id="flink" hidden><input id="flinkurl" type="text" inputmode="url" placeholder="https://…" aria-label="Link address"><button id="flinkok">Add link</button><button id="flinkno" aria-label="Cancel">✕</button></span>
+      <span class="grow"></span>
+      <label>Size <select id="fsize"><option value="m">Normal</option><option value="s">Small</option><option value="l">Large</option><option value="xl">Extra large</option></select></label>
+      <label>Align <select id="falign"><option value="left">Left</option><option value="center">Centered</option></select></label>
+    </div>
     <div class="stagewrap" id="preview"></div><p class="muted small">Click any text on the slide to edit it right there. Media, video, and wheel spins play in the preview just as they will when presenting.</p></main>
   <section class="props" id="props"></section>
   <div class="modal" id="picker" hidden><div class="mbox" role="dialog" aria-label="Add a slide"><div class="mhead"><h2>Add a slide</h2><button class="btn ghost" id="pclose">Close</button></div><div id="pgrid"></div></div></div>
@@ -77,6 +86,7 @@ export async function mount(root, store, id) {
     if (T && T.after) T.after(s, el, ctxFor(s, 'edit'), false);
     if (arr) arr.render();
     if (inl) inl.enable();
+    fmtSync();
     $('#slabel').textContent = `Slide ${sel + 1} of ${deck.slides.length} · ${T ? T.label : s.type}`;
   }
   $('#sample').onchange = e => { sample = e.target.checked; drawPreview(); drawThumbs(); };
@@ -237,8 +247,39 @@ export async function mount(root, store, id) {
   inl = createInline($('#preview'), {
     getSlide: () => deck.slides[sel],
     onField: f => { const el = props.querySelector(`[data-k="${f}"]`), v = deck.slides[sel][f]; if (el && document.activeElement !== el) el.value = Array.isArray(v) ? v.join('\n') : (v ?? ''); updateThumb(); queue(); },
-    onDone: () => drawPreview()
+    onDone: () => drawPreview(),
+    onFocus: () => fmtSync()
   });
+
+  // ---- formatting bar (shown on slides with body text) ----
+  const fbar = $('#fmtbar');
+  function fmtSync() {
+    const s = deck.slides[sel], hasBody = TYPES[s.type] && TYPES[s.type].fields.some(f => f.k === 'body');
+    fbar.hidden = !hasBody; if (!hasBody) return;
+    const on = !!(inl && inl.bodyActive);
+    fbar.classList.toggle('active', on);
+    fbar.querySelectorAll('[data-cmd]').forEach(b => { b.disabled = !on; b.classList.toggle('on', on && ['bold', 'italic', 'underline', 'insertUnorderedList', 'insertOrderedList'].includes(b.dataset.cmd) && inl.state(b.dataset.cmd)); });
+    $('#fsize').value = s.size || 'm'; $('#falign').value = s.align || 'left';
+  }
+  fbar.addEventListener('mousedown', e => { if (e.target.closest('[data-cmd]')) e.preventDefault(); }); // keep the text selection
+  fbar.addEventListener('click', e => {
+    const b = e.target.closest('[data-cmd]'); if (!b || b.disabled) return;
+    if (b.dataset.cmd === 'link') { inl.keep(); $('#flink').hidden = false; $('#flinkurl').value = ''; $('#flinkurl').focus(); return; }
+    inl.apply(b.dataset.cmd); fmtSync();
+  });
+  const linkDone = ok => {
+    let u = $('#flinkurl').value.trim(); $('#flink').hidden = true;
+    if (!ok || !u) { inl.reset(); return; }
+    if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    u = u.replace(/^http:\/\//i, 'https://');
+    if (inl.collapsed) inl.apply('insertHTML', `<a href="${esc(u)}">${esc(u)}</a>`); else inl.apply('createLink', u);
+  };
+  $('#flinkok').onclick = () => linkDone(true); $('#flinkno').onclick = () => linkDone(false);
+  $('#flinkurl').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); linkDone(true); } if (e.key === 'Escape') { e.preventDefault(); linkDone(false); } };
+  document.addEventListener('selectionchange', () => { if (inl && inl.bodyActive) fmtSync(); });
+  const setStyle = (k, v) => { deck.slides[sel][k] = v; const el = props.querySelector(`[data-k="${k}"]`); if (el) el.value = v; drawPreview(); updateThumb(); queue(); };
+  $('#fsize').onchange = e => setStyle('size', e.target.value);
+  $('#falign').onchange = e => setStyle('align', e.target.value);
   function select(i) { sel = i; root.querySelectorAll('.thumbs li').forEach(l => l.classList.toggle('on', +l.dataset.i === sel)); drawPreview(); drawProps(); }
   function drawAll() { drawThumbs(); drawPreview(); drawProps(); }
   drawAll();
