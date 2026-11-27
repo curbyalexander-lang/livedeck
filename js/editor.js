@@ -5,6 +5,7 @@ import { openThemePanel } from './themepanel.js?v=2.3';
 import { openWidgetLib } from './widgetlib.js?v=2.3';
 import { VERSION } from './version.js?v=2.3';
 import { createArrange } from './arrange.js?v=2.3';
+import { createInline } from './inline.js?v=2.3';
 import { safeUrl } from './util.js?v=2.3';
 
 export async function mount(root, store, id) {
@@ -13,7 +14,7 @@ export async function mount(root, store, id) {
   deck.id = id; deck.slides = Array.isArray(deck.slides) ? deck.slides : [];
   if (!deck.slides.length) deck.slides.push(newSlide('title'));
   deck.theme = normalize(deck.theme || DEFAULT_THEME); loadFonts(deck.theme);
-  let sel = 0, sample = true, timer = 0, saving = Promise.resolve(), dragFrom = -1, widgets = {}, arr = null;
+  let sel = 0, sample = true, timer = 0, saving = Promise.resolve(), dragFrom = -1, widgets = {}, arr = null, inl = null;
   const setWidgets = arr => { widgets = {}; (arr || []).forEach(w => widgets[w.id] = w); };
   try { setWidgets(await store.listItems('widgets')); } catch (e) { }
 
@@ -25,7 +26,7 @@ export async function mount(root, store, id) {
   <aside class="rail"><ol id="thumbs" class="thumbs"></ol><button class="btn add" id="add">+ Add slide</button></aside>
   <main class="canvas"><div class="ctop"><span id="slabel" class="muted"></span>
     <label class="chk"><input type="checkbox" id="sample" checked> Preview with sample results</label></div>
-    <div class="stagewrap" id="preview"></div><p class="muted small">Media, video, and wheel spins play in the preview just as they will when presenting.</p></main>
+    <div class="stagewrap" id="preview"></div><p class="muted small">Click any text on the slide to edit it right there. Media, video, and wheel spins play in the preview just as they will when presenting.</p></main>
   <section class="props" id="props"></section>
   <div class="modal" id="picker" hidden><div class="mbox" role="dialog" aria-label="Add a slide"><div class="mhead"><h2>Add a slide</h2><button class="btn ghost" id="pclose">Close</button></div><div id="pgrid"></div></div></div>
   </div>`;
@@ -72,9 +73,10 @@ export async function mount(root, store, id) {
   // ---- preview ----
   function drawPreview() {
     const s = deck.slides[sel], T = TYPES[s.type], el = $('#preview');
-    el.innerHTML = renderSlide(s, ctxFor(s, 'edit'));
+    el.innerHTML = renderSlide(s, { ...ctxFor(s, 'edit'), inline: true });
     if (T && T.after) T.after(s, el, ctxFor(s, 'edit'), false);
     if (arr) arr.render();
+    if (inl) inl.enable();
     $('#slabel').textContent = `Slide ${sel + 1} of ${deck.slides.length} · ${T ? T.label : s.type}`;
   }
   $('#sample').onchange = e => { sample = e.target.checked; drawPreview(); drawThumbs(); };
@@ -230,6 +232,12 @@ export async function mount(root, store, id) {
     getSlide: () => deck.slides[sel],
     onSelect: id => root.querySelectorAll('.picrow').forEach(r => r.classList.toggle('on', r.dataset.pid === id)),
     onCommit: structural => { if (structural) { drawPreview(); drawProps(); } updateThumb(); queue(); }
+  });
+  // Type directly on the slide; keep the panel's fields in step.
+  inl = createInline($('#preview'), {
+    getSlide: () => deck.slides[sel],
+    onField: f => { const el = props.querySelector(`[data-k="${f}"]`), v = deck.slides[sel][f]; if (el && document.activeElement !== el) el.value = Array.isArray(v) ? v.join('\n') : (v ?? ''); updateThumb(); queue(); },
+    onDone: () => drawPreview()
   });
   function select(i) { sel = i; root.querySelectorAll('.thumbs li').forEach(l => l.classList.toggle('on', +l.dataset.i === sel)); drawPreview(); drawProps(); }
   function drawAll() { drawThumbs(); drawPreview(); drawProps(); }

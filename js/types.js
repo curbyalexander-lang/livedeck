@@ -32,7 +32,12 @@ function richText(t) {
   }).join('');
 }
 const img = (src, alt) => safeUrl(src) ? `<img src="${esc(safeUrl(src))}" alt="${esc(alt || '')}">` : `<div class="ph">Add an image in the panel</div>`;
-const h1 = t => t ? `<h1>${esc(t)}</h1>` : '';
+// While the editor renders its preview, text gets data-f (field) / data-i (list index) markers so it
+// can be edited in place. EDIT is only true during that one synchronous render.
+let EDIT = false;
+const A = (f, i, ph) => EDIT ? ` data-f="${f}"${i != null ? ` data-i="${i}"` : ''}${ph ? ` data-ph="${esc(ph)}"` : ''}` : '';
+const h1 = (t, f, req) => t || (EDIT && req) ? `<h1${f ? A(f, null, req ? 'Type a heading' : '') : ''}>${esc(t)}</h1>` : '';
+const body = t => `<div class="body"${EDIT ? ` data-f="body" data-ph="Type here" data-raw="${esc(t || '')}"` : ''}>${richText(t)}</div>`;
 
 function videoEmbed(url, thumb) {
   const u = String(url || '').trim();
@@ -57,15 +62,15 @@ function videoStill(url) {
 // ---------- shared pieces for interactive slides ----------
 function interactiveStage(T, s, ctx) {
   const v = ctx.values || [], on = !!ctx.reveal;
-  if (ctx.exporting && !v.length) // exported without results: show the activity itself, not a live counter
-    return `<div class="head">${h1(s.prompt)}</div><div class="viz">${T.still ? T.still(s) : ''}</div><p class="foot">Live activity</p>`;
+  if ((ctx.exporting || ctx.mode === 'edit') && !v.length) // exported or edited without results: show the activity itself, not a live counter
+    return `<div class="head">${h1(s.prompt, 'prompt', true)}</div><div class="viz">${T.still ? T.still(s) : ''}</div><p class="foot">Live activity</p>`;
   const stat = `${v.length} ${v.length === 1 ? 'response' : 'responses'}${on && T.stat ? T.stat(s, v) : ''}`;
   const foot = on ? (ctx.mode === 'edit' ? 'Sample results shown for preview' : '') : (ctx.mode === 'present' ? 'Results hidden. Press R to reveal.' : 'Results stay hidden until you reveal them');
-  return `<div class="head">${h1(s.prompt)}<p class="stat">${stat}</p></div>
+  return `<div class="head">${h1(s.prompt, 'prompt', true)}<p class="stat">${stat}</p></div>
   <div class="viz">${on ? T.viz(s, v) : `<div class="wait"><span class="wn">${v.length}</span><span class="wl">${v.length === 1 ? 'response' : 'responses'} so far</span></div>`}</div>
   <p class="foot">${foot}</p>`;
 }
-const rows = items => `<div class="rows">${items.map(r => `<div class="row${r.top ? ' lead' : ''}"><span>${esc(r.label)}</span><span class="rt"><span class="rb" style="width:${Math.max(0, Math.min(100, r.pct)).toFixed(1)}%"></span></span><span class="rv">${r.right}</span></div>`).join('')}</div>`;
+const rows = items => `<div class="rows">${items.map(r => `<div class="row${r.top ? ' lead' : ''}"><span>${r.num ? r.num + '. ' : ''}<span${r.f ? A(r.f, r.i) : ''}>${esc(r.label)}</span></span><span class="rt"><span class="rb" style="width:${Math.max(0, Math.min(100, r.pct)).toFixed(1)}%"></span></span><span class="rv">${r.right}</span></div>`).join('')}</div>`;
 
 // ---------- spinner drawing ----------
 function wheel(items) {
@@ -98,42 +103,42 @@ export const TYPES = {
     label: 'Title', group: 'Content', blurb: 'Big title and subtitle',
     defaults: { title: 'Presentation title', sub: 'Subtitle' },
     fields: [F('title', 'Title'), F('sub', 'Subtitle')],
-    stage: s => `<div class="tcenter"><h1 class="big">${esc(s.title)}</h1>${s.sub ? `<p class="sub">${esc(s.sub)}</p>` : ''}</div>`,
+    stage: s => `<div class="tcenter"><h1 class="big"${A('title', null, 'Type a title')}>${esc(s.title)}</h1>${s.sub || EDIT ? `<p class="sub"${A('sub', null, 'Subtitle (optional)')}>${esc(s.sub)}</p>` : ''}</div>`,
     phone: s => `<h2>${esc(s.title)}</h2><p class="look">${esc(s.sub)}</p>`
   },
   text: {
     label: 'Text', group: 'Content', blurb: 'Heading with paragraphs or bullets',
     defaults: { heading: 'Heading', body: 'Write a paragraph here.\n\n- Start lines with a dash\n- to make bullet points' },
     fields: [F('heading', 'Heading'), F('body', 'Body', 'textarea', 'Leave a blank line between paragraphs. Start lines with "- " for bullets.')],
-    stage: s => `${h1(s.heading)}<div class="body">${richText(s.body)}</div>`,
+    stage: s => `${h1(s.heading, 'heading', true)}${body(s.body)}`,
     phone: s => `<h2>${esc(s.heading)}</h2><div class="pbody">${richText(s.body)}</div>`
   },
   image: {
     label: 'Image', group: 'Content', blurb: 'One picture, with optional heading and caption',
     defaults: { heading: '', src: '', alt: '', caption: '', fit: 'contain' },
     fields: [F('heading', 'Heading (optional)'), F('src', 'Image', 'media'), F('alt', 'Alt text', 'text', 'Describes the image for screen readers'), F('caption', 'Caption'), F('fit', 'Fit', 'select', '', [['contain', 'Show the whole image'], ['cover', 'Fill the space']])],
-    stage: s => `${h1(s.heading)}<div class="media fit-${s.fit === 'cover' ? 'cover' : 'contain'}">${img(s.src, s.alt)}</div>${s.caption ? `<p class="cap">${esc(s.caption)}</p>` : ''}`,
+    stage: s => `${h1(s.heading, 'heading')}<div class="media fit-${s.fit === 'cover' ? 'cover' : 'contain'}">${img(s.src, s.alt)}</div>${s.caption ? `<p class="cap"${A('caption')}>${esc(s.caption)}</p>` : ''}`,
     phone: s => `${s.heading ? `<h2>${esc(s.heading)}</h2>` : ''}<div class="pimg">${img(s.src, s.alt)}</div>${s.caption ? `<p class="look">${esc(s.caption)}</p>` : ''}`
   },
   split: {
     label: 'Image + text', group: 'Content', blurb: 'Text on one side, picture on the other',
     defaults: { heading: 'Heading', body: 'Explain the picture here.', src: '', alt: '', side: 'right' },
     fields: [F('heading', 'Heading'), F('body', 'Body', 'textarea', 'Blank line = new paragraph. "- " = bullet.'), F('src', 'Image', 'media'), F('alt', 'Alt text'), F('side', 'Image side', 'select', '', [['right', 'Right'], ['left', 'Left']])],
-    stage: s => `<div class="split${s.side === 'left' ? ' rev' : ''}"><div>${h1(s.heading)}<div class="body">${richText(s.body)}</div></div><div class="media">${img(s.src, s.alt)}</div></div>`,
+    stage: s => `<div class="split${s.side === 'left' ? ' rev' : ''}"><div>${h1(s.heading, 'heading', true)}${body(s.body)}</div><div class="media">${img(s.src, s.alt)}</div></div>`,
     phone: s => `<h2>${esc(s.heading)}</h2><div class="pbody">${richText(s.body)}</div><div class="pimg">${img(s.src, s.alt)}</div>`
   },
   blank: {
     label: 'Free layout', group: 'Content', blurb: 'Place several pictures anywhere; drag to move and resize',
     defaults: { heading: '', pics: [] },
     fields: [F('heading', 'Heading (optional)')],
-    stage: s => h1(s.heading) || (s.pics && s.pics.length ? '' : '<div class="ph">Add pictures in the panel, then drag them into place</div>'),
+    stage: s => h1(s.heading, 'heading') || (s.pics && s.pics.length ? '' : '<div class="ph">Add pictures in the panel, then drag them into place</div>'),
     phone: s => s.heading ? `<h2>${esc(s.heading)}</h2>` : ''
   },
   video: {
     label: 'Video', group: 'Content', blurb: 'YouTube, Vimeo, or an .mp4 file',
     defaults: { heading: '', url: '' },
     fields: [F('heading', 'Heading (optional)'), F('url', 'Video link', 'text', 'YouTube, Vimeo, or a direct .mp4 link (a file in your repo works too, e.g. media/clip.mp4)')],
-    stage: (s, ctx) => `${h1(s.heading)}<div class="media vid">${ctx.exporting ? videoStill(s.url) : videoEmbed(s.url, ctx.thumb)}</div>`,
+    stage: (s, ctx) => `${h1(s.heading, 'heading')}<div class="media vid">${ctx.exporting ? videoStill(s.url) : videoEmbed(s.url, ctx.thumb)}</div>`,
     phone: s => `${s.heading ? `<h2>${esc(s.heading)}</h2>` : ''}<p class="look"><strong>Watch the screen.</strong></p>`
   },
 
@@ -141,13 +146,13 @@ export const TYPES = {
     label: 'Poll', group: 'Interactive', blurb: 'Everyone picks one option; live bars', interactive: true,
     defaults: { prompt: 'Your question?', options: ['Option A', 'Option B', 'Option C'] },
     fields: [F('prompt', 'Question'), F('options', 'Options', 'list', 'One per line, 2 to 8')],
-    still: s => `<ol class="exlist">${list(s.options, 8).map(o => `<li>${esc(o)}</li>`).join('')}</ol>`,
+    still: s => `<ol class="exlist">${list(s.options, 8).map((o, i) => `<li${A('options', i)}>${esc(o)}</li>`).join('')}</ol>`,
     valid: (s, v) => Number.isInteger(v) && v >= 0 && v < list(s.options, 8).length,
     sim: (s, rnd) => Math.min(Math.floor(rnd() ** 1.4 * list(s.options, 8).length), list(s.options, 8).length - 1),
     viz(s, v) {
       const o = list(s.options, 8), c = o.map(() => 0); v.forEach(x => c[x]++);
       const t = Math.max(1, v.length), mx = Math.max(...c);
-      return rows(o.map((label, i) => ({ label, pct: c[i] / t * 100, top: mx > 0 && c[i] === mx, right: `${Math.round(c[i] / t * 100)}% <small>(${c[i]})</small>` })));
+      return rows(o.map((label, i) => ({ label, f: 'options', i, pct: c[i] / t * 100, top: mx > 0 && c[i] === mx, right: `${Math.round(c[i] / t * 100)}% <small>(${c[i]})</small>` })));
     },
     mount(s, el, v, submit) {
       el.innerHTML = list(s.options, 8).map((o, i) => `<button class="opt${v === i ? ' sel' : ''}" data-i="${i}">${esc(o)}</button>`).join('');
@@ -158,13 +163,13 @@ export const TYPES = {
     label: 'Slider', group: 'Interactive', blurb: 'Rate on a scale; live histogram and average', interactive: true,
     defaults: { prompt: 'How confident are you?', min: 0, max: 10, lo: 'Not at all', hi: 'Completely' },
     fields: [F('prompt', 'Question'), F('min', 'Lowest value', 'number'), F('max', 'Highest value', 'number', 'Up to 20 steps from lowest to highest'), F('lo', 'Low-end label'), F('hi', 'High-end label')],
-    still: s => `<div class="vcol exscale"><div class="cls">${Array.from({ length: +s.max - +s.min + 1 }, (_, i) => `<span>${i + +s.min}</span>`).join('')}</div><div class="ends"><span>${esc(s.lo)}</span><span>${esc(s.hi)}</span></div></div>`,
+    still: s => `<div class="vcol exscale"><div class="cls">${Array.from({ length: +s.max - +s.min + 1 }, (_, i) => `<span>${i + +s.min}</span>`).join('')}</div><div class="ends"><span${A('lo')}>${esc(s.lo)}</span><span${A('hi')}>${esc(s.hi)}</span></div></div>`,
     valid: (s, v) => Number.isInteger(v) && v >= +s.min && v <= +s.max,
     sim: (s, rnd) => { const a = +s.min, b = +s.max; return Math.max(a, Math.min(b, Math.round(a + (b - a) * (.62 + (rnd() + rnd() + rnd() - 1.5) * .3)))); },
     stat: (s, v) => v.length ? ` · average ${(v.reduce((a, b) => a + b, 0) / v.length).toFixed(1)}` : '',
     viz(s, v) {
       const a = +s.min, bins = Array(+s.max - a + 1).fill(0); v.forEach(x => bins[x - a]++); const mx = Math.max(1, ...bins);
-      return `<div class="vcol"><div class="hist">${bins.map(c => `<div class="col"><div class="b" style="height:${c / mx * 100}%"><span class="cn">${c || ''}</span></div></div>`).join('')}</div><div class="cls">${bins.map((c, i) => `<span>${i + a}</span>`).join('')}</div><div class="ends"><span>${esc(s.lo)}</span><span>${esc(s.hi)}</span></div></div>`;
+      return `<div class="vcol"><div class="hist">${bins.map(c => `<div class="col"><div class="b" style="height:${c / mx * 100}%"><span class="cn">${c || ''}</span></div></div>`).join('')}</div><div class="cls">${bins.map((c, i) => `<span>${i + a}</span>`).join('')}</div><div class="ends"><span${A('lo')}>${esc(s.lo)}</span><span${A('hi')}>${esc(s.hi)}</span></div></div>`;
     },
     mount(s, el, v, submit) {
       const mid = Math.round((+s.min + +s.max) / 2);
@@ -177,14 +182,14 @@ export const TYPES = {
     label: 'Ranking', group: 'Interactive', blurb: 'Everyone puts items in order; shows the group ranking', interactive: true,
     defaults: { prompt: 'Rank these from most to least important', items: ['First item', 'Second item', 'Third item', 'Fourth item'] },
     fields: [F('prompt', 'Prompt'), F('items', 'Items', 'list', 'One per line, 2 to 8')],
-    still: s => `<ol class="exlist">${list(s.items, 8).map(o => `<li>${esc(o)}</li>`).join('')}</ol>`,
+    still: s => `<ol class="exlist">${list(s.items, 8).map((o, i) => `<li${A('items', i)}>${esc(o)}</li>`).join('')}</ol>`,
     valid(s, v) { const k = list(s.items, 8).length; return Array.isArray(v) && v.length === k && new Set(v).size === k && v.every(x => Number.isInteger(x) && x >= 0 && x < k); },
     sim(s, rnd) { const a = [...list(s.items, 8).keys()]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; },
     viz(s, v) {
       const its = list(s.items, 8), k = its.length, sum = Array(k).fill(0);
       v.forEach(o => o.forEach((it, pos) => sum[it] += pos + 1));
       const avg = sum.map(x => v.length ? x / v.length : 0), order = [...its.keys()].sort((a, b) => avg[a] - avg[b]);
-      return rows(order.map((i, r) => ({ label: `${r + 1}. ${its[i]}`, pct: v.length ? (k + 1 - avg[i]) / k * 100 : 0, top: r === 0 && v.length > 0, right: `<small>avg rank</small> ${avg[i].toFixed(1)}` })));
+      return rows(order.map((i, r) => ({ label: its[i], num: r + 1, f: 'items', i, pct: v.length ? (k + 1 - avg[i]) / k * 100 : 0, top: r === 0 && v.length > 0, right: `<small>avg rank</small> ${avg[i].toFixed(1)}` })));
     },
     mount(s, el, v, submit) {
       const its = list(s.items, 8); let o = (Array.isArray(v) ? v : [...its.keys()]).slice(); let locked = Array.isArray(v);
@@ -224,7 +229,7 @@ export const TYPES = {
     label: 'Spinner', group: 'Interactive', blurb: 'You spin; every phone sees where it lands', action: 'Spin',
     defaults: { title: 'Spin for a discussion prompt', items: ['A lesson that flopped', 'A tool you abandoned', 'Your best "aha" moment', 'A student who surprised you'] },
     fields: [F('title', 'Title'), F('items', 'Wheel items', 'list', 'One per line, 2 to 12')],
-    stage: (s, ctx) => `${h1(s.title)}<div class="split spinrow"><div class="wheelbox">${wheel(list(s.items, 12))}</div><div>${ctx.exporting && !ctx.live ? '' : '<p class="lbl">The wheel says</p>'}<p class="result" data-res></p><ol class="plist">${list(s.items, 12).map(x => `<li>${esc(x)}</li>`).join('')}</ol></div></div>`,
+    stage: (s, ctx) => `${h1(s.title, 'title', true)}<div class="split spinrow"><div class="wheelbox">${wheel(list(s.items, 12))}</div><div>${ctx.exporting && !ctx.live ? '' : '<p class="lbl">The wheel says</p>'}<p class="result" data-res></p><ol class="plist">${list(s.items, 12).map((x, i) => `<li${A('items', i)}>${esc(x)}</li>`).join('')}</ol></div></div>`,
     after: (s, root, ctx, animate) => spinTo(root, s, ctx.live, animate, ctx.mode),
     run(s, prev) { const k = list(s.items, 12).length; let idx = Math.floor(Math.random() * k); if (prev && k > 1 && idx === prev.idx) idx = (idx + 1) % k; return { idx, n: Date.now() }; },
     mount(s, el) { el.innerHTML = `<div class="pwheel">${wheel(list(s.items, 12))}</div><p class="result" data-res></p>`; }
@@ -241,7 +246,9 @@ export function newSlide(type) {
 export function renderSlide(s, ctx = {}) {
   const T = TYPES[s && s.type];
   if (!T) return `<div class="slide"><p class="body">Unknown slide type</p></div>`;
-  return `<div class="slide t-${s.type}" style="${themeStyle(ctx.theme)}">${picsHtml(s, true)}${T.stage(s, ctx)}${picsHtml(s, false)}</div>`;
+  EDIT = ctx.mode === 'edit' && !!ctx.inline;
+  try { return `<div class="slide t-${s.type}" style="${themeStyle(ctx.theme)}">${picsHtml(s, true)}${T.stage(s, ctx)}${picsHtml(s, false)}</div>`; }
+  finally { EDIT = false; }
 }
 // Pictures layer: any slide can carry freely placed pictures (s.pics), each positioned in
 // percent of the slide: { id, src, alt, x, y, w, h, fit: 'contain'|'cover', back: behind the text? }
