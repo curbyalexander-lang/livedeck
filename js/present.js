@@ -5,6 +5,7 @@
 import { TYPES, renderSlide, esc } from './types.js?v=2.3';
 import { createInk } from './ink.js?v=2.3';
 import { prepare, valuesFor, downloadCsv, qrSvg, inkSync } from './live.js?v=2.3';
+import * as CFG from './config.js?v=2.3';
 
 export const mount = (root, store, deckId) => display(root, store, { deckId });
 
@@ -35,7 +36,8 @@ export async function display(root, store, { deckId, code }) {
 
   const base = location.href.split('#')[0];
   const joinUrl = base + '#join-' + code, remoteUrl = base + '#remote-' + code;
-  const shortBase = (base + '#join').replace(/^https?:\/\//, '');
+  // What the join screen tells people to type. Set SHORT_JOIN_URL in js/config.js to show a short link instead.
+  const shortBase = String(CFG.SHORT_JOIN_URL || (base + '#join')).replace(/^https?:\/\//, '').replace(/\/$/, '');
   let responses = [], showBadge = true, ended = false, remoteAt = 0;
 
   root.innerHTML = `<div class="pres">
