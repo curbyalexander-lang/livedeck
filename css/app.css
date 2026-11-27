@@ -383,3 +383,9 @@ canvas.ink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
 .endbtns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:3cqi 0 0}
 .rended .endbtns{justify-content:flex-start;margin:8px 0 0}
 .rended p{margin:0}
+/* editing text directly on the slide (editor preview) */
+.stagewrap [contenteditable]{cursor:text;outline:1px dashed transparent;outline-offset:.4cqi;border-radius:.4cqi;transition:outline-color .15s}
+.stagewrap [contenteditable]:hover{outline-color:rgba(29,95,209,.55)}
+.stagewrap [contenteditable]:focus{outline:2px solid var(--acc);outline-offset:.4cqi;background:color-mix(in srgb,var(--s-bg) 92%,var(--s-acc))}
+.stagewrap [data-f]:empty::before{content:attr(data-ph);color:var(--s-mute);opacity:.7}
+.stagewrap .body.rawedit{white-space:pre-wrap;min-height:6cqi}
