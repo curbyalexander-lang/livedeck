@@ -115,6 +115,8 @@ export async function mount(root, store, id) {
     $('#props').innerHTML = `<div class="phead"><h2>${esc(T ? T.label : s.type)}</h2>
       <div class="ptools"><button class="btn small" data-act="up" aria-label="Move slide up"${sel === 0 ? ' disabled' : ''}>↑</button><button class="btn small" data-act="down" aria-label="Move slide down"${sel === deck.slides.length - 1 ? ' disabled' : ''}>↓</button><button class="btn small" data-act="dup">Duplicate</button><button class="btn small ghost" data-act="del"${deck.slides.length < 2 ? ' disabled' : ''}>Delete</button></div></div>
       ${T ? `<p class="muted small">${esc(T.blurb)}</p>` + T.fields.map(f => fieldHtml(f, s[f.k])).join('') : ''}
+      <div class="field"><label for="f-hsize">Heading size</label><div class="mediaf"><select id="f-hsize" data-k="hsize">${[['m', 'Normal'], ['s', 'Small'], ['l', 'Large'], ['xl', 'Extra large']].map(([v, l]) => `<option value="${v}"${(s.hsize || 'm') === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
+        <button class="btn small" data-act="hsizeall" title="Give every slide in this presentation this heading size">Use on all slides</button></div><small id="hsizemsg"></small></div>
       ${picsPanel(s)}
       <div class="field"><label for="f-notes">Speaker notes</label><textarea id="f-notes" data-k="notes" rows="4">${esc(s.notes || '')}</textarea><small>Only you see these, below the slide while presenting.</small></div>`;
   }
@@ -197,6 +199,7 @@ export async function mount(root, store, id) {
     const a = b.dataset.act, S = deck.slides;
     if (a === 'addpic') { const u = props.querySelector('#newpic').value.trim(); if (!safeUrl(u)) { props.querySelector('#picerr').textContent = 'That doesn\u2019t look like an image link (it should start with https://).'; return; } addPics([u]); return; }
     if (a === 'wedit') return openLib(S[sel].widgetId);
+    if (a === 'hsizeall') { const v = S[sel].hsize || 'm'; S.forEach(x => { if (v === 'm') delete x.hsize; else x.hsize = v; }); drawThumbs(); drawPreview(); queue(); props.querySelector('#hsizemsg').textContent = `All ${S.length} slides now use this heading size.`; return; }
     if (a === 'up' && sel > 0) { [S[sel - 1], S[sel]] = [S[sel], S[sel - 1]]; sel--; }
     else if (a === 'down' && sel < S.length - 1) { [S[sel + 1], S[sel]] = [S[sel], S[sel + 1]]; sel++; }
     else if (a === 'dup') { const copy = JSON.parse(JSON.stringify(S[sel])); copy.id = newSlide(copy.type).id; S.splice(sel + 1, 0, copy); sel++; }

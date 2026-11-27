@@ -241,7 +241,7 @@ export function renderSlide(s, ctx = {}) {
   const T = TYPES[s && s.type];
   if (!T) return `<div class="slide"><p class="body">Unknown slide type</p></div>`;
   EDIT = ctx.mode === 'edit' && !!ctx.inline;
-  try { return `<div class="slide t-${s.type}" style="${themeStyle(ctx.theme)}">${picsHtml(s, true)}${T.stage(s, ctx)}${picsHtml(s, false)}</div>`; }
+  try { return `<div class="slide t-${s.type}${({ s: ' hs-s', l: ' hs-l', xl: ' hs-xl' })[s.hsize] || ''}" style="${themeStyle(ctx.theme)}">${picsHtml(s, true)}${T.stage(s, ctx)}${picsHtml(s, false)}</div>`; }
   finally { EDIT = false; }
 }
 // Pictures layer: any slide can carry freely placed pictures (s.pics), each positioned in
