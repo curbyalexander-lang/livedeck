@@ -17,6 +17,7 @@
 
 import { esc, safeUrl } from './util.js?v=2.3';
 import { mdToHtml } from './format.js?v=2.3';
+import { quizTypes } from './quiz.js?v=2.3';
 import { themeStyle } from './themes.js?v=2.3';
 import { customType } from './widgets.js?v=2.3';
 export { esc, safeUrl };
@@ -57,14 +58,14 @@ function videoStill(url) {
 function interactiveStage(T, s, ctx) {
   const v = ctx.values || [], on = !!ctx.reveal;
   if ((ctx.exporting || ctx.mode === 'edit') && !v.length) // exported or edited without results: show the activity itself, not a live counter
-    return `<div class="head">${h1(s.prompt, 'prompt', true)}</div><div class="viz">${T.still ? T.still(s) : ''}</div><p class="foot">Live activity</p>`;
+    return `<div class="head">${h1(s.prompt, 'prompt', true)}</div><div class="viz">${ctx.mode === 'edit' && T.edit ? T.edit(s) : T.still ? T.still(s) : ''}</div><p class="foot">Live activity</p>`;
   const stat = `${v.length} ${v.length === 1 ? 'response' : 'responses'}${on && T.stat ? T.stat(s, v) : ''}`;
   const foot = on ? (ctx.mode === 'edit' ? 'Sample results shown for preview' : '') : (ctx.mode === 'present' ? 'Results hidden. Press R to reveal.' : 'Results stay hidden until you reveal them');
   return `<div class="head">${h1(s.prompt, 'prompt', true)}<p class="stat">${stat}</p></div>
-  <div class="viz">${on ? T.viz(s, v) : `<div class="wait"><span class="wn">${v.length}</span><span class="wl">${v.length === 1 ? 'response' : 'responses'} so far</span></div>`}</div>
+  <div class="viz">${on ? T.viz(s, v) : T.pending ? T.pending(s, v) : `<div class="wait"><span class="wn">${v.length}</span><span class="wl">${v.length === 1 ? 'response' : 'responses'} so far</span></div>`}</div>
   <p class="foot">${foot}</p>`;
 }
-const rows = items => `<div class="rows">${items.map(r => `<div class="row${r.top ? ' lead' : ''}"><span>${r.num ? r.num + '. ' : ''}<span${r.f ? A(r.f, r.i) : ''}>${esc(r.label)}</span></span><span class="rt"><span class="rb" style="width:${Math.max(0, Math.min(100, r.pct)).toFixed(1)}%"></span></span><span class="rv">${r.right}</span></div>`).join('')}</div>`;
+const rows = items => `<div class="rows">${items.map(r => `<div class="row${r.top ? ' lead' : ''}"><span>${r.num ? r.num + '. ' : ''}<span${r.f ? A(r.f, r.i) : ''}>${esc(r.label)}</span>${r.chip || ''}</span><span class="rt"><span class="rb" style="width:${Math.max(0, Math.min(100, r.pct)).toFixed(1)}%"></span></span><span class="rv">${r.right}</span></div>`).join('')}</div>`;
 
 // ---------- spinner drawing ----------
 function wheel(items) {
@@ -230,6 +231,7 @@ export const TYPES = {
   }
 };
 
+Object.assign(TYPES, quizTypes({ F, esc, rows }));
 TYPES.custom = customType({ F, h1 });
 for (const T of Object.values(TYPES)) if (T.interactive && !T.stage) T.stage = (s, ctx) => interactiveStage(T, s, ctx);
 
@@ -265,5 +267,6 @@ export function describe(s, v) {
   if (s.type === 'poll') return list(s.options, 8)[v] ?? '';
   if (s.type === 'rank') return v.map(i => list(s.items, 8)[i]).join(' > ');
   if (s.type === 'custom') return v;
+  if (TYPES[s.type] && TYPES[s.type].describe) return TYPES[s.type].describe(s, v);
   return String(v);
 }

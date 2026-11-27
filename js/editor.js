@@ -14,7 +14,7 @@ export async function mount(root, store, id) {
   deck.id = id; deck.slides = Array.isArray(deck.slides) ? deck.slides : [];
   if (!deck.slides.length) deck.slides.push(newSlide('title'));
   deck.theme = normalize(deck.theme || DEFAULT_THEME); loadFonts(deck.theme);
-  let sel = 0, sample = true, timer = 0, saving = Promise.resolve(), dragFrom = -1, widgets = {}, arr = null, inl = null;
+  let sel = 0, sample = true, timer = 0, saving = Promise.resolve(), dragFrom = -1, widgets = {}, arr = null, inl = null, hotPicking = false;
   const setWidgets = arr => { widgets = {}; (arr || []).forEach(w => widgets[w.id] = w); };
   try { setWidgets(await store.listItems('widgets')); } catch (e) { }
 
@@ -102,6 +102,22 @@ export async function mount(root, store, id) {
     else if (f.type === 'media') input = `<div class="mediaf"><input id="${id}" data-k="${f.k}" type="text" inputmode="url" placeholder="https://…  or  media/photo.jpg" value="${esc(String(v || '').startsWith('data:') ? '' : v)}">
       ${store.canUpload ? `<label class="btn small">Upload<input type="file" accept="image/*" data-up="${f.k}" hidden></label>` : ''}</div>
       ${String(v || '').startsWith('data:') ? '<small>Uploaded image stored in this browser. <button class="linkbtn" data-clear="' + f.k + '">Remove</button></small>' : ''}<small class="uperr" data-uperr="${f.k}"></small>`;
+    else if (f.type === 'rows') { // a small table: one row per statement / choice / pair / item
+      const sl = deck.slides[sel], rws = Array.isArray(v) ? v : [];
+      const col = (c, r, i) => {
+        const val = r[c.k] ?? '';
+        if (c.type === 'select') { const opts = typeof c.opts === 'function' ? c.opts(sl) : c.opts; return `<select data-rk="${c.k}" data-ri="${i}" aria-label="${esc(c.k)} for row ${i + 1}">${opts.map(([ov, ol]) => `<option value="${esc(ov)}"${String(val) === String(ov) ? ' selected' : ''}>${esc(ol)}</option>`).join('')}</select>`; }
+        if (c.type === 'check') return `<label class="chk small"><input type="checkbox" data-rk="${c.k}" data-ri="${i}"${val ? ' checked' : ''}> ${esc(c.label)}</label>`;
+        return `<input type="text" data-rk="${c.k}" data-ri="${i}" value="${esc(val)}" placeholder="${esc(c.ph || '')}" aria-label="${esc(c.ph || c.k)} ${i + 1}">`;
+      };
+      input = `<div class="rowsf" data-rows="${f.k}">${rws.map((r, i) => `<div class="rowi"><span class="rnum">${i + 1}</span>${f.cols.map(c => col(c, r, i)).join('')}<button class="btn small ghost" data-rowdel="${i}" aria-label="Remove row ${i + 1}"${rws.length <= 2 ? ' disabled' : ''}>✕</button></div>`).join('')}
+        <button class="btn small" data-rowadd="${f.k}"${rws.length >= (f.max || 10) ? ' disabled' : ''}>+ ${esc(f.addLabel || 'Add')}</button></div>`;
+    }
+    else if (f.type === 'hotarea') {
+      const sl = deck.slides[sel], on = Number(sl.tr) > 0;
+      input = `<div class="hotf"><button class="btn small${hotPicking ? ' on' : ''}" data-act="hotpick">${hotPicking ? 'Click the spot on the slide…' : on ? 'Move it: click on the slide' : 'Set it: click on the slide'}</button>
+        <select data-k="tr" aria-label="Size of the correct area">${[['0', 'No correct area'], ['0.05', 'Small circle'], ['0.09', 'Medium circle'], ['0.15', 'Large circle']].map(([ov, ol]) => `<option value="${ov}"${String(Number(sl.tr) || 0) === ov ? ' selected' : ''}>${ol}</option>`).join('')}</select></div>`;
+    }
     else if (f.type === 'widget') {
       const ws = Object.values(widgets).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       input = `<select id="${id}" data-k="${f.k}"><option value="">Choose a widget…</option>${ws.map(w => `<option value="${esc(w.id)}"${w.id === v ? ' selected' : ''}>${esc(w.name || 'Untitled')}</option>`).join('')}</select>
@@ -168,12 +184,21 @@ export async function mount(root, store, id) {
       let n = Math.round(Number(el.value)); if (!Number.isFinite(n)) return;
       s[k] = n;
       if (s.type === 'slider') { if (k === 'min' && s.max <= s.min) s.max = s.min + 1; if (k === 'max' && s.max <= s.min) s.min = s.max - 1; if (s.max - s.min > 20) { if (k === 'min') s.max = s.min + 20; else s.min = s.max - 20; } }
-    } else s[k] = el.value;
+    } else if (k === 'tr') s[k] = Number(el.value) || 0;
+    else s[k] = el.value;
+    if (s.type === 'hotspot' && k === 'src') measureAr(s);
     drawPreview(); updateThumb(); queue();
     if (f.type === 'widget') drawProps();
   }
+  // Hotspot pictures need their shape so dots land in the same place on every screen
+  function measureAr(s) {
+    if (!s.src) { s.ar = 0; return; }
+    const im = new Image(); im.onload = () => { s.ar = +(im.naturalWidth / im.naturalHeight).toFixed(4); if (deck.slides[sel] === s) drawPreview(); updateThumb(); queue(); }; im.src = s.src;
+  }
   const props = $('#props');
   props.oninput = e => {
+    const rk = e.target.dataset.rk;
+    if (rk) { const key = e.target.closest('[data-rows]').dataset.rows, sl = deck.slides[sel], r = (sl[key] || [])[+e.target.dataset.ri]; if (!r) return; r[rk] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; drawPreview(); updateThumb(); queue(); return; }
     const pk = e.target.dataset.pk;
     if (pk) { const row = e.target.closest('.picrow'), p = (deck.slides[sel].pics || []).find(x => x.id === row.dataset.pid); if (!p) return; p[pk] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; drawPreview(); updateThumb(); queue(); return; }
     const k = e.target.dataset.k; if (k && e.target.type !== 'file') setField(k, e.target);
@@ -181,6 +206,7 @@ export async function mount(root, store, id) {
   props.onkeydown = e => { if (e.target.id === 'newpic' && e.key === 'Enter') { e.preventDefault(); props.querySelector('[data-act="addpic"]').click(); } };
   props.onchange = async e => {
     if (e.target.tagName === 'SELECT') return; // handled by input
+    if (e.target.dataset.k === 'categories') { drawProps(); return; } // refresh the group choices for each item
     if (e.target.dataset.picup && e.target.files.length) {
       const err = props.querySelector('#picerr'); err.textContent = 'Uploading…'; const urls = [];
       for (const f of [...e.target.files].slice(0, 12)) { try { urls.push(await store.upload(f)); } catch (x) { err.textContent = x.message || 'Upload failed.'; } }
@@ -189,14 +215,25 @@ export async function mount(root, store, id) {
     }
     const k = e.target.dataset.up; if (!k || !e.target.files[0]) return;
     const msg = props.querySelector(`[data-uperr="${k}"]`); msg.textContent = 'Uploading…';
-    try { deck.slides[sel][k] = await store.upload(e.target.files[0]); drawProps(); drawPreview(); updateThumb(); queue(); }
+    try { deck.slides[sel][k] = await store.upload(e.target.files[0]); if (deck.slides[sel].type === 'hotspot' && k === 'src') measureAr(deck.slides[sel]); drawProps(); drawPreview(); updateThumb(); queue(); }
     catch (x) { msg.textContent = x.message || 'Upload failed.'; }
   };
   props.onclick = e => {
     const c = e.target.closest('[data-clear]'); if (c) { deck.slides[sel][c.dataset.clear] = ''; drawProps(); drawPreview(); updateThumb(); queue(); return; }
     const pa = e.target.closest('[data-pa]'); if (pa) return picAction(pa.dataset.pa, pa.closest('.picrow').dataset.pid);
+    const ra = e.target.closest('[data-rowadd],[data-rowdel]');
+    if (ra && !ra.disabled) {
+      const sl = deck.slides[sel], key = ra.dataset.rowadd || ra.closest('[data-rows]').dataset.rows, f = TYPES[sl.type].fields.find(x => x.k === key);
+      sl[key] = Array.isArray(sl[key]) ? sl[key] : [];
+      if (ra.dataset.rowadd) { const blank = {}; f.cols.forEach(c => blank[c.k] = c.type === 'check' ? false : ''); sl[key].push(blank); }
+      else sl[key].splice(+ra.dataset.rowdel, 1);
+      drawProps(); drawPreview(); updateThumb(); queue();
+      if (ra.dataset.rowadd) { const ins = props.querySelectorAll(`[data-rows="${key}"] .rowi input[type=text]`); const last = [...ins].filter(x => x.dataset.ri == sl[key].length - 1)[0]; last && last.focus(); }
+      return;
+    }
     const b = e.target.closest('[data-act]'); if (!b) return;
     const a = b.dataset.act, S = deck.slides;
+    if (a === 'hotpick') { hotPicking = !hotPicking; drawProps(); return; }
     if (a === 'addpic') { const u = props.querySelector('#newpic').value.trim(); if (!safeUrl(u)) { props.querySelector('#picerr').textContent = 'That doesn\u2019t look like an image link (it should start with https://).'; return; } addPics([u]); return; }
     if (a === 'wedit') return openLib(S[sel].widgetId);
     if (a === 'hsizeall') { const v = S[sel].hsize || 'm'; S.forEach(x => { if (v === 'm') delete x.hsize; else x.hsize = v; }); drawThumbs(); drawPreview(); queue(); props.querySelector('#hsizemsg').textContent = `All ${S.length} slides now use this heading size.`; return; }
@@ -241,6 +278,14 @@ export async function mount(root, store, id) {
   $('#export').onclick = async () => { const { openExport } = await import('./export.js?v=2.3'); openExport({ store, deck, widgets }); };
   $('#present').onclick = async () => { await save(); location.hash = '#present-' + id; };
 
+  // Hotspot: click the picture on the slide to set the correct area
+  $('#preview').addEventListener('pointerdown', e => {
+    if (!hotPicking) return; const w = e.target.closest('.hwrap'); if (!w) return;
+    e.preventDefault(); e.stopPropagation();
+    const r = w.getBoundingClientRect(), s = deck.slides[sel];
+    s.tx = +((e.clientX - r.left) / r.width).toFixed(3); s.ty = +((e.clientY - r.top) / r.height).toFixed(3); if (!(Number(s.tr) > 0)) s.tr = 0.09;
+    hotPicking = false; drawPreview(); drawProps(); updateThumb(); queue();
+  }, true);
   arr = createArrange($('#preview'), {
     getSlide: () => deck.slides[sel],
     onSelect: id => root.querySelectorAll('.picrow').forEach(r => r.classList.toggle('on', r.dataset.pid === id)),
@@ -283,7 +328,7 @@ export async function mount(root, store, id) {
   const setStyle = (k, v) => { deck.slides[sel][k] = v; const el = props.querySelector(`[data-k="${k}"]`); if (el) el.value = v; drawPreview(); updateThumb(); queue(); };
   $('#fsize').onchange = e => setStyle('size', e.target.value);
   $('#falign').onchange = e => setStyle('align', e.target.value);
-  function select(i) { sel = i; root.querySelectorAll('.thumbs li').forEach(l => l.classList.toggle('on', +l.dataset.i === sel)); drawPreview(); drawProps(); }
+  function select(i) { sel = i; hotPicking = false; root.querySelectorAll('.thumbs li').forEach(l => l.classList.toggle('on', +l.dataset.i === sel)); drawPreview(); drawProps(); }
   function drawAll() { drawThumbs(); drawPreview(); drawProps(); }
   drawAll();
 
